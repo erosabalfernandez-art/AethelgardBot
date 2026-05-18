@@ -1,0 +1,62 @@
+═══════════════════════════════════════════════════════
+  AETHELGARD — Bot RPG de Telegram
+  Instrucciones para correr en tu PC
+═══════════════════════════════════════════════════════
+
+REQUISITOS
+----------
+- Python 3.10 o superior  →  https://www.python.org/downloads/
+- Conexión a internet
+
+INSTALACIÓN (solo la primera vez)
+-----------------------------------
+1. Abre una terminal en esta carpeta
+2. Instala las dependencias:
+
+      pip install -r requirements.txt
+
+3. Configura tus variables de entorno (o edita un archivo .env):
+
+   Windows (cmd):
+      set TELEGRAM_BOT_TOKEN=tu_token_aqui
+      set SUPERADMIN_ID=tu_user_id_de_telegram
+
+   Windows (PowerShell):
+      $env:TELEGRAM_BOT_TOKEN="tu_token_aqui"
+      $env:SUPERADMIN_ID="tu_user_id_de_telegram"
+
+   Linux / Mac:
+      export TELEGRAM_BOT_TOKEN="tu_token_aqui"
+      export SUPERADMIN_ID="tu_user_id_de_telegram"
+
+   Alternativa: crea un archivo ".env" en esta carpeta con:
+      TELEGRAM_BOT_TOKEN=tu_token_aqui
+      SUPERADMIN_ID=tu_user_id_de_telegram
+   (requiere instalar python-dotenv y descomentar las líneas en main.py)
+
+ARRANCAR EL BOT
+----------------
+      python main.py
+
+BASE DE DATOS
+--------------
+- El archivo "aethelgard.db" es la base de datos SQLite.
+- Se incluye con todos los datos actuales del juego.
+- Se actualiza automáticamente cada vez que el bot corre.
+- Para empezar desde cero: borra aethelgard.db (se recreará al arrancar).
+
+ARCHIVOS IMPORTANTES
+---------------------
+- main.py          → Punto de entrada principal
+- db_helper.py     → Capa de base de datos
+- aethelgard.db    → Base de datos SQLite (jugadores, items, config)
+- requirements.txt → Dependencias Python
+
+NOTAS
+------
+- Python 3.11 recomendado para máxima compatibilidad.
+- El bot usa python-telegram-bot v22.7 (async con asyncio).
+- No modifiques el token en el código — usa siempre la variable de entorno.
+- Si ves errores de "flood control", es normal: Telegram limita las peticiones.
+
+═══════════════════════════════════════════════════════
