@@ -327,11 +327,15 @@ def _teclado_guerra_activa(guerra_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton("⏭️ Saltarse",    callback_data=f"gf_saltar_{guerra_id}"),
             InlineKeyboardButton("📊 Marcador",     callback_data=f"gf_estado_{guerra_id}"),
         ],
+        [
+            InlineKeyboardButton("🔄 Ver menú de guerra", callback_data="gf_ver_menu_comandos"),
+        ],
     ])
 
 def _teclado_ya_actuo() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📊 Ver marcador provisional", callback_data="gf_marcador_solo")],
+        [InlineKeyboardButton("🔄 Ver menú de guerra",       callback_data="gf_ver_menu_comandos")],
     ])
 
 def _teclado_elegir_faccion(guerra_id: int, accion: str, facs: List[str]) -> InlineKeyboardMarkup:
@@ -1478,6 +1482,30 @@ async def terminar_guerra_automatica(guerra: dict, bot):
     await _terminar_guerra_impl(bot, guerra)
 
 
+async def _cb_gf_ver_menu_comandos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Botón '🔄 Ver menú de guerra': actualiza el menú '/' del jugador a los comandos de guerra."""
+    query = update.callback_query
+    await query.answer("🔄 Actualizando…", show_alert=False)
+    user_id = update.effective_user.id
+    # Quitar el botón del mensaje para evitar pulsaciones repetidas
+    try:
+        await query.edit_message_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    # Actualizar el menú "/" con los comandos de guerra
+    try:
+        from zonas_comandos import _disparar_toggle_menu
+        await _disparar_toggle_menu(context.bot, user_id)
+    except Exception:
+        pass
+    # Confirmación visible
+    await context.bot.send_message(
+        chat_id=user_id,
+        text="✅ *Menú de guerra actualizado.* Escribe `/` para ver los comandos disponibles.",
+        parse_mode="Markdown",
+    )
+
+
 # ==================== REGISTRO DE HANDLERS ====================
 def registrar_handlers(app):
     global _app
@@ -1497,6 +1525,9 @@ def registrar_handlers(app):
     app.add_handler(CommandHandler("guerra_facciones_estado",    cmd_guerra_facciones_estado))
     app.add_handler(CommandHandler("guerra_facciones_ranking",   cmd_guerra_facciones_ranking))
     app.add_handler(CommandHandler("saltar_guerra",              cmd_saltar_guerra))
+
+    # Botón "Ver menú de guerra" (registrar ANTES del patrón genérico ^gf_)
+    app.add_handler(CallbackQueryHandler(_cb_gf_ver_menu_comandos, pattern="^gf_ver_menu_comandos$"))
 
     # Callbacks de los botones persistentes (mensajes enviados a jugadores)
     app.add_handler(CallbackQueryHandler(cb_gf, pattern="^gf_"))

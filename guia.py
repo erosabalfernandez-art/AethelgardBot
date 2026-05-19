@@ -990,11 +990,50 @@ PAGINAS = {
             "anti-spam (1 acción cada 1.5s por jugador) y cache inteligente de datos."
         ),
         "anterior": "cooldowns_guia",
+        "siguiente": "menu_rapido",
+    },
+    "menu_rapido": {
+        "titulo": "📱 GUÍA — Menú Rápido e Interfaz",
+        "texto": (
+            "📱 El menú rápido es la barra de botones que aparece en la parte inferior del chat. "
+            "Funciona como un atajo para los comandos más usados del juego.\n\n"
+            "🔄 ACTUALIZAR MENÚ (primer botón siempre)\n"
+            "Pulsa este botón cada vez que cambies de zona o cuando haya una guerra de facciones. "
+            "El menú se actualizará automáticamente mostrando los botones correctos:\n"
+            "• 🏙️ Si estás en ciudad → muestra el menú de ciudad.\n"
+            "• 🌲 Si estás en zona salvaje → muestra el menú de zona salvaje.\n"
+            "• ⚔️ Si hay guerra de facciones activa → muestra el menú de guerra.\n\n"
+            "⚙️ EDITAR MENÚ (solo en ciudad)\n"
+            "Disponible únicamente cuando estás en una ciudad. "
+            "Te permite personalizar qué botones quieres ver en cada menú:\n"
+            "• Puedes ocultar botones que no uses con frecuencia.\n"
+            "• Puedes mostrarlos de nuevo cuando los necesites.\n"
+            "• Los cambios se guardan de forma permanente.\n"
+            "• Hay un editor separado para el menú de ciudad y el de zona salvaje.\n"
+            "• Botón ↩️ Restaurar todo: vuelve a mostrar todos los botones por defecto.\n\n"
+            "🔲 OCULTAR MENÚ\n"
+            "Oculta completamente la barra de botones. Útil si prefieres escribir comandos. "
+            "Cuando lo ocultas, aparece un botón inline 📱 Activar y mostrar menú "
+            "para volver a mostrarlo fácilmente.\n\n"
+            "/menu (o /teclado)\n"
+            "Comando para alternar el menú: si está visible lo oculta, "
+            "si está oculto lo muestra. Funciona igual que el botón 🔲 Ocultar menú.\n\n"
+            "💡 MENÚS SEGÚN ZONA\n"
+            "🏙️ Ciudad: Perfil · Ciudad · Inventario · Viajar · Duelos · Gremio · "
+            "Rankings · Umbral · Comandos · Guía\n"
+            "🌲 Zona Salvaje: Recolectar · Investigar · Mazmorra · Viajar · Perfil · "
+            "Inventario · Comandos · Guía (+ Emboscadas PvP en zonas avanzadas)\n"
+            "⚔️ Guerra de Facciones: Atacar en guerra · Defender en guerra · Saltar guerra · "
+            "Perfil · Inventario · Guía\n\n"
+            "⚠️ Los botones 🔄 Actualizar menú y 🔲 Ocultar menú siempre están presentes "
+            "y no se pueden ocultar desde el editor.\n"
+            "⚙️ El botón ⚙️ Editar menú solo aparece en el menú de ciudad."
+        ),
+        "anterior": "nuevos_sistemas",
         "siguiente": None,
     },
 }
 
-# ─── TECLADOS ─────────────────────────────────────────────────────────────────
 
 def _build_keyboard(pagina_id: str, user_id: int = 0) -> InlineKeyboardMarkup:
     pag = PAGINAS[pagina_id]
@@ -1050,6 +1089,7 @@ def _indice_keyboard(user_id: int = 0) -> InlineKeyboardMarkup:
         [InlineKeyboardButton("20 👥 Jugadores en Zona",        callback_data="guia_zona_activa_guia")],
         [InlineKeyboardButton("21 ⏱️ Cooldowns",                callback_data="guia_cooldowns_guia")],
         [InlineKeyboardButton("22 🆕 Todos los Nuevos Sistemas",callback_data="guia_nuevos_sistemas")],
+        [InlineKeyboardButton("23 📱 Menú Rápido e Interfaz",       callback_data="guia_menu_rapido")],
         [InlineKeyboardButton(estado_txt,                        callback_data="toggle_guia")],
     ])
 

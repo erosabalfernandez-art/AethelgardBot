@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: aethelgard-miniapp
+    runtime: python
+    plan: free
+    buildCommand: |
+      pip install -r backend/requirements.txt &&
+      cd frontend &&
+      npm install &&
+      npm run build &&
+      cp -r dist ../backend/
+    startCommand: python backend/main.py
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: DB_PATH
+        value: /data/aethelgard.db
+      - key: PORT
+        value: "8000"
+    disk:
+      name: aethelgard-db
+      mountPath: /data
+      sizeGB: 1

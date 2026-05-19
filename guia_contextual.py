@@ -249,7 +249,7 @@ MENSAJES = {
         "💀 SI PIERDES\n"
         "⚠️ Pierdes el {pct_oro_derrota_pve}% del oro que llevas encima.\n"
         "❤️ Tu HP cae al {pct_hp_derrota}% del máximo.\n"
-        "Usa /descansar o pociones para recuperarte antes de tu próxima batalla.\n\n"
+        "Usa pociones del inventario o visita la Taberna para recuperarte antes de tu próxima batalla.\n\n"
         "💡 Consejo: si tu vida es baja, usa pociones del inventario antes de atacar."
     ),
 
@@ -410,6 +410,23 @@ MENSAJES = {
         "Ya puedes viajar y participar en combates de nuevo.\n"
         "💡 Revisa tu equipamiento con /inventario antes de tu próximo duelo."
     ),
+
+    # ── MENÚ RÁPIDO ──────────────────────────────────────────────────────────
+    "menu_actualizado": (
+        "📱 GUÍA: Tu menú rápido se ha actualizado a la zona actual.\n\n"
+        "🔄 BOTÓN ACTUALIZAR MENÚ\n"
+        "Siempre que cambies de zona (ciudad ↔ zona salvaje) o cuando empiece "
+        "una guerra de facciones, pulsa el botón 🔄 Actualizar menú para ver "
+        "los botones correctos para tu situación.\n\n"
+        "⚙️ EDITOR DE MENÚ (solo en ciudad)\n"
+        "Si estás en ciudad, puedes personalizar qué botones quieres en tu menú. "
+        "Pulsa ⚙️ Editar menú para abrir el panel de configuración.\n\n"
+        "🔲 OCULTAR MENÚ\n"
+        "Si prefieres usar comandos de texto, pulsa 🔲 Ocultar menú. "
+        "Para recuperar el menú usa /menu o el botón que aparece al ocultarlo.\n\n"
+        "💡 Usa /guia → capítulo 23 para ver la guía completa del sistema de menús."
+    ),
+
 
     # ── CRAFTEO / RECETAS ──────────────────────────────────────────────────────
     "crafteo_sin_recetas": (

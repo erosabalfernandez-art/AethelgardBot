@@ -178,6 +178,7 @@ async def cmd_investigar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⚔️ Emboscada local (PvP)", callback_data="pvpm_local_negra")],
         [InlineKeyboardButton("🌐 Caza multizonal (PvP)", callback_data="pvpm_multi_negra")],
         [InlineKeyboardButton("🧘‍♂️ Meditar", callback_data=f"investigar_meditar_negra_{zona_nombre}")],
+        [InlineKeyboardButton("👥 Jugadores en zona", callback_data="investigar_zona_jug")],
         [InlineKeyboardButton("❌ Cerrar", callback_data="investigar_cerrar")]
     ]
     await update.effective_message.reply_text(texto, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
@@ -740,6 +741,15 @@ async def investigar_cerrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     await query.edit_message_text("Investigación cerrada.")
 
+async def investigar_zona_jug(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    try:
+        import zona_activa as _za
+        await _za.cmd_zona_jugadores(update, context)
+    except Exception as e:
+        await query.edit_message_text(f"❌ Error al obtener jugadores en zona: {e}")
+
 def registrar_handlers(app):
     app.add_handler(CommandHandler("investigar", cmd_investigar))
     app.add_handler(CommandHandler("desactivar_paz", cmd_desactivar_paz))
@@ -747,6 +757,7 @@ def registrar_handlers(app):
     app.add_handler(CallbackQueryHandler(meditar,             pattern="^investigar_meditar_negra_"))
     app.add_handler(CallbackQueryHandler(meditar_auto,        pattern="^meditar_auto_"))
     app.add_handler(CallbackQueryHandler(investigar_cerrar,   pattern="^investigar_cerrar$"))
+    app.add_handler(CallbackQueryHandler(investigar_zona_jug, pattern="^investigar_zona_jug$"))
     app.add_handler(CallbackQueryHandler(buscar_rivales_pvp,   pattern="^pvp_negra_buscar$"))
     app.add_handler(CallbackQueryHandler(atacar_rival_pvp,     pattern="^pvp_negra_atacar_"))
     app.add_handler(CallbackQueryHandler(aceptar_pvp_negra,    pattern="^pvp_negra_aceptar_"))

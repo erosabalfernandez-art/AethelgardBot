@@ -93,6 +93,23 @@ import config_balance
 import clases
 import inventario
 from datos_zona import ZONAS
+
+
+def _get_nombres_habilidades(user_id: int) -> tuple:
+    """Devuelve (nombre_hab1, nombre_hab2) para la clase del jugador."""
+    try:
+        jug = db_helper.obtener_jugador(user_id)
+        if jug:
+            clase = jug.get("clase", "")
+            habs = clases.HABILIDADES_ACTIVAS.get(clase, [])
+            nombre1 = habs[0]["nombre"] if len(habs) > 0 else "Habilidad 1"
+            nombre2 = habs[1]["nombre"] if len(habs) > 1 else "Habilidad 2"
+            return (nombre1, nombre2)
+    except Exception:
+        pass
+    return ("Habilidad 1", "Habilidad 2")
+
+
 try:
     from armas import ARMAS
 except ImportError:
@@ -337,6 +354,69 @@ TIEMPO_UNIRSE_CAZA = 90
 TIEMPO_TURNO = 90
 TIEMPO_SALA_MAZMORRA = 300
 
+# ==================== SISTEMA DE TIERS POR ZONA ====================
+# Umbrales de poder_total del jugador para determinar su tier en cada zona.
+# Calculados con stats reales de equipo (nivel, rareza, daño, defensa).
+# El admin puede ajustar los stats de monstruos via bg_m_vida/daño/def en el panel.
+#
+# Zona azul   - naked=1.9k, peor equipo=3k, mejor equipo azul=158k
+# Zona amarilla - mejor equipo azul al entrar=240k, mejor amarilla=697k
+# Zona roja   - mejor equipo amarilla al entrar=987k, mejor roja=1.01M
+# Zona negra  - mejor equipo roja al entrar=1.4M, mejor negra=2.16M
+#
+# (t1, t2): poder < t1 → Tier 1, t1 ≤ poder < t2 → Tier 2, poder ≥ t2 → Tier 3
+TIER_UMBRALES = {
+    "azul":     (8_000,       80_000),
+    "amarilla": (300_000,     580_000),
+    "roja":     (400_000,     850_000),
+    "negra":    (1_500_000,   2_000_000),
+}
+
+# Stats fijos de monstruo por zona y tier.
+# Tier 4 = mini-boss (solo via seguir_huellas / COMBATE_PVE_MINI).
+# Los multiplicadores de admin bg_m_vida/daño/def/xp/oro se aplican sobre estos valores.
+#
+# Fórmula de daño en combate: daño_final = max(1, daño_base * 100 / (defensa_enemigo + 100))
+# Tier 1 → ganables con equipo malo de la zona
+# Tier 2 → requieren equipo decente
+# Tier 3 → requieren equipo bueno/mejor de la zona
+# Tier 4 → mini-boss, siempre difícil
+TIER_STATS_ZONA = {
+    "azul": {
+        1: {"vida": 70,    "daño": 16,   "defensa": 5,   "xp": 35,    "oro": 22},
+        2: {"vida": 140,   "daño": 30,   "defensa": 12,  "xp": 80,    "oro": 50},
+        3: {"vida": 300,   "daño": 55,   "defensa": 22,  "xp": 175,   "oro": 110},
+        4: {"vida": 550,   "daño": 95,   "defensa": 40,  "xp": 390,   "oro": 245},
+    },
+    "amarilla": {
+        1: {"vida": 200,   "daño": 45,   "defensa": 20,  "xp": 190,   "oro": 120},
+        2: {"vida": 500,   "daño": 90,   "defensa": 50,  "xp": 420,   "oro": 260},
+        3: {"vida": 1000,  "daño": 170,  "defensa": 90,  "xp": 850,   "oro": 530},
+        4: {"vida": 1800,  "daño": 300,  "defensa": 150, "xp": 1800,  "oro": 1100},
+    },
+    "roja": {
+        1: {"vida": 350,   "daño": 100,  "defensa": 45,  "xp": 750,   "oro": 470},
+        2: {"vida": 900,   "daño": 180,  "defensa": 90,  "xp": 1700,  "oro": 1050},
+        3: {"vida": 1400,  "daño": 280,  "defensa": 130, "xp": 3400,  "oro": 2100},
+        4: {"vida": 2500,  "daño": 480,  "defensa": 220, "xp": 7000,  "oro": 4300},
+    },
+    "negra": {
+        1: {"vida": 500,   "daño": 160,  "defensa": 70,  "xp": 2800,  "oro": 1700},
+        2: {"vida": 1300,  "daño": 320,  "defensa": 150, "xp": 6500,  "oro": 4000},
+        3: {"vida": 2800,  "daño": 650,  "defensa": 280, "xp": 13000, "oro": 8000},
+        4: {"vida": 5000,  "daño": 1200, "defensa": 500, "xp": 26000, "oro": 16000},
+    },
+}
+
+def determinar_tier_jugador(poder_total: float, color_zona: str) -> int:
+    """Retorna el tier (1, 2 o 3) del jugador según su poder_total y la zona."""
+    t1, t2 = TIER_UMBRALES.get(color_zona, (10_000, 100_000))
+    if poder_total < t1:
+        return 1
+    elif poder_total < t2:
+        return 2
+    return 3
+
 # ==================== ESTRUCTURAS DE DATOS EN MEMORIA ====================
 combates_activos = {}          # duelos y PvE simples
 eventos_caza = {}              # eventos de caza (group combats)
@@ -570,19 +650,21 @@ def _calcular_poder_monstruo(monstruo: dict) -> float:
     return (vida * daño) / (defensa + 1)
 
 def generar_monstruo_escalable(atacante_id: int, zona_nombre: str, color_zona: str, tipo_monstruo: str) -> dict:
-    poder_jug = calcular_poder_jugador(atacante_id)
-    poder_total = poder_jug["poder_total"]
-    if tipo_monstruo == "normales":
-        mult = 1.0
-    elif tipo_monstruo == "mini_boss":
-        mult = 2.5
-    elif tipo_monstruo == "mazmorras_normal":
-        mult = 1.8
-    elif tipo_monstruo == "mazmorras_dificil":
-        mult = 2.5
-    else:
-        mult = 1.0
-    poder_mon = poder_total * mult
+    """
+    Genera un monstruo con stats fijos calibrados por zona y tier del jugador.
+
+    Probabilidades de encuentro:
+      60% → tier del jugador (apropiado)
+      30% → un tier superior (más difícil, mayor prob. de huida)
+      10% → un tier inferior (más fácil, menor prob. de huida)
+
+    Mini-bosses (tipo_monstruo == "mini_boss"): siempre tier 4, solo
+    aparecen via seguir_huellas / COMBATE_PVE_MINI, nunca en exploración normal.
+
+    Los multiplicadores de admin bg_m_vida/daño/def/xp/oro (panel de balance)
+    se aplican sobre los stats base — sin tocar esta lógica.
+    """
+    # ── Multiplicadores de admin (panel de balance — PRESERVADOS) ──────────────
     try:
         _bg_vida = float(db_helper.obtener_config("bg_m_vida", "1.0"))
         _bg_daño = float(db_helper.obtener_config("bg_m_daño", "1.0"))
@@ -591,35 +673,50 @@ def generar_monstruo_escalable(atacante_id: int, zona_nombre: str, color_zona: s
         _bg_oro  = float(db_helper.obtener_config("bg_m_oro",  "1.0"))
     except Exception:
         _bg_vida = _bg_daño = _bg_def = _bg_xp = _bg_oro = 1.0
-    vida    = max(1, int(poder_mon ** 0.5 * 20 * _bg_vida))
-    daño    = max(1, int(poder_mon ** 0.5 * 4  * _bg_daño))
-    defensa = max(1, int(poder_mon ** 0.5 * 2  * _bg_def))
-    xp  = max(10, int(poder_total / 10 * _bg_xp))
-    oro = max(5,  int(poder_total / 20 * _bg_oro))
-    # Los drops se asignarán después, al momento de la creación, basados en el nombre del monstruo.
-    # Para monstruos escalables, el nombre se genera aquí y luego se buscarán sus drops.
-    # Intentar usar un nombre real de la lista de monstruos de la zona en datos_zona
-    _zd_gen = next((z for z in ZONAS if z["nombre"] == zona_nombre), None)
-    _lista_mon = (_zd_gen.get("monstruos", {}).get(tipo_monstruo, [])) if _zd_gen else []
-    if _lista_mon:
-        nombre_base = random.choice(_lista_mon)["nombre"]
+
+    # ── Determinar tier del monstruo ───────────────────────────────────────────
+    if tipo_monstruo == "mini_boss":
+        # Mini-boss: siempre tier 4 (el más fuerte de la zona)
+        tier = 4
     else:
-        nombre_base = f"Criatura de {zona_nombre}"
-    # Creamos el monstruo sin drops todavía, los drops se asignarán al final de esta función
+        poder_jug = calcular_poder_jugador(atacante_id)
+        tier_base = determinar_tier_jugador(poder_jug["poder_total"], color_zona)
+        # 65% su tier | 20% un tier mayor | 15% un tier menor
+        ruleta = random.random()
+        if ruleta < 0.15:
+            tier = max(1, tier_base - 1)
+        elif ruleta < 0.35:
+            tier = min(3, tier_base + 1)
+        else:
+            tier = tier_base
+
+    # ── Stats base por zona/tier ───────────────────────────────────────────────
+    stats_zona = TIER_STATS_ZONA.get(color_zona, TIER_STATS_ZONA["azul"])
+    base = stats_zona.get(tier, stats_zona[1])
+
+    vida    = max(1, int(base["vida"]    * _bg_vida))
+    daño    = max(1, int(base["daño"]    * _bg_daño))
+    defensa = max(0, int(base["defensa"] * _bg_def))
+    xp      = max(5, int(base["xp"]      * _bg_xp))
+    oro     = max(2, int(base["oro"]      * _bg_oro))
+
+    # ── Nombre del monstruo ────────────────────────────────────────────────────
+    _zd_gen = next((z for z in ZONAS if z["nombre"] == zona_nombre), None)
+    _lista_mon = (_zd_gen.get("monstruos", {}).get("normales", [])) if _zd_gen else []
+    nombre_base = random.choice(_lista_mon)["nombre"] if _lista_mon else f"Criatura de {zona_nombre}"
+
     monstruo = {
-        "nombre": nombre_base,
-        "descripcion": "Una criatura dinámica que se adapta a tu poder.",
-        "vida": vida,
-        "vida_max": vida,
-        "daño": daño,
-        "defensa": defensa,
-        "xp": xp,
-        "oro": oro,
-        # drops se calcularán después
+        "nombre":      nombre_base,
+        "descripcion": f"Criatura de zona {color_zona} (tier {tier}).",
+        "vida":        vida,
+        "vida_max":    vida,
+        "daño":        daño,
+        "defensa":     defensa,
+        "xp":          xp,
+        "oro":         oro,
+        "_tier":       tier,
     }
-    # Ahora obtener drops exclusivos para este monstruo (si existen en DROPS_POR_MONSTRUO)
-    drops = _obtener_drops_para_monstruo(zona_nombre, nombre_base)
-    monstruo["drops"] = drops
+    monstruo["drops"] = _obtener_drops_para_monstruo(zona_nombre, nombre_base)
     return monstruo
 
 def cargar_monstruo_fijo(zona_nombre: str, tipo_monstruo: str) -> Optional[dict]:
@@ -856,21 +953,20 @@ async def iniciar_combate(update: Update, context: ContextTypes.DEFAULT_TYPE,
             tipo_mon = "mini_boss"
         else:
             tipo_mon = "normales"
-        # Regla 50%
-        if random.random() < 0.5:
-            monstruo = cargar_monstruo_fijo(zona_nombre, tipo_mon)
-            if monstruo is None:
-                monstruo = generar_monstruo_escalable(atacante_id, zona_nombre, color, tipo_mon)
-            es_fijo = True
-        else:
-            monstruo = generar_monstruo_escalable(atacante_id, zona_nombre, color, tipo_mon)
-            es_fijo = False
-        poder_jug = calcular_poder_jugador(atacante_id)["poder_total"]
-        poder_mon = _calcular_poder_monstruo(monstruo)
+        # Siempre usar el generador por tiers (60/30/10 probabilidad)
+        monstruo = generar_monstruo_escalable(atacante_id, zona_nombre, color, tipo_mon)
+        # Probabilidad de huida base por zona
         prob_huida = HUIR_PROB_BASE.get(tipo_combate, 0.5)
-        if es_fijo and poder_mon > poder_jug * 1.2:
-            diferencia = poder_mon / poder_jug
-            prob_huida = min(0.9, prob_huida + (diferencia - 1) * 0.3)
+        # Ajuste por tier: si salió un monstruo más fuerte → más fácil huir;
+        # si salió uno más débil → ligeramente más difícil (no merece huir)
+        if tipo_mon != "mini_boss":
+            poder_jug = calcular_poder_jugador(atacante_id)["poder_total"]
+            tier_jug  = determinar_tier_jugador(poder_jug, color)
+            tier_mon  = monstruo.get("_tier", tier_jug)
+            if tier_mon > tier_jug:
+                prob_huida = min(0.95, prob_huida + 0.15 * (tier_mon - tier_jug))
+            elif tier_mon < tier_jug:
+                prob_huida = max(0.05, prob_huida - 0.10)
         enemigo = monstruo
         datos_extra = {"prob_huida": prob_huida}
     # Normalizar enemigo PvE — garantizar que 'vida', 'vida_max' y 'vida_actual' existen
@@ -968,13 +1064,14 @@ def _construir_panel_pve(combate_id: str) -> tuple:
     _rest = combate.get("restricciones", {})
     _permit_hab  = _rest.get("habilidades_pve", True)
     _permit_huir = _rest.get("huir", True)
+    _hab1_pve, _hab2_pve = _get_nombres_habilidades(combate["atacante_id"])
     keyboard = [
         [InlineKeyboardButton("⚔️ Atacar", callback_data=f"combate_accion_{combate_id}_ataque")],
     ]
     if _permit_hab:
         keyboard.append([
-            InlineKeyboardButton("✨ Habilidad 1", callback_data=f"combate_accion_{combate_id}_habilidad1"),
-            InlineKeyboardButton("🔮 Habilidad 2", callback_data=f"combate_accion_{combate_id}_habilidad2"),
+            InlineKeyboardButton(f"✨ {_hab1_pve}", callback_data=f"combate_accion_{combate_id}_habilidad1"),
+            InlineKeyboardButton(f"🔮 {_hab2_pve}", callback_data=f"combate_accion_{combate_id}_habilidad2"),
         ])
     keyboard.append([InlineKeyboardButton("🧪 Usar poción", callback_data=f"combate_accion_{combate_id}_pocion")])
     if _permit_huir and prob_huida > 0:
@@ -1012,13 +1109,15 @@ async def mostrar_mensaje_combate(update: Update, context: ContextTypes.DEFAULT_
         _rest = combate.get("restricciones", {})
         _permit_hab  = _rest.get("habilidades_pvp", True)
         _permit_huir = _rest.get("huir", True)
+        _viewer_pvp = update.effective_user.id
+        _hab1_pvp_mc, _hab2_pvp_mc = _get_nombres_habilidades(_viewer_pvp)
         keyboard = [
             [InlineKeyboardButton("⚔️ Atacar", callback_data=f"combate_accion_{combate_id}_ataque")],
         ]
         if _permit_hab:
             keyboard.append([
-                InlineKeyboardButton("✨ Habilidad 1", callback_data=f"combate_accion_{combate_id}_habilidad1"),
-                InlineKeyboardButton("🔮 Habilidad 2", callback_data=f"combate_accion_{combate_id}_habilidad2"),
+                InlineKeyboardButton(f"✨ {_hab1_pvp_mc}", callback_data=f"combate_accion_{combate_id}_habilidad1"),
+                InlineKeyboardButton(f"🔮 {_hab2_pvp_mc}", callback_data=f"combate_accion_{combate_id}_habilidad2"),
             ])
         keyboard.append([InlineKeyboardButton("🧪 Usar poción", callback_data=f"combate_accion_{combate_id}_pocion")])
         if _permit_huir and prob_huida > 0 and not tipo.startswith("caza"):
@@ -1053,13 +1152,14 @@ async def _enviar_panel_pvp_a(context, combate_id: str, chat_id: int):
     )
     _rest_pvp = combate.get("restricciones", {})
     _permit_hab_pvp = _rest_pvp.get("habilidades", True)
+    _hab1_enviar, _hab2_enviar = _get_nombres_habilidades(chat_id)
     keyboard = [
         [InlineKeyboardButton("⚔️ Atacar", callback_data=f"combate_accion_{combate_id}_ataque")],
     ]
     if _permit_hab_pvp:
         keyboard.append([
-            InlineKeyboardButton("✨ Habilidad 1", callback_data=f"combate_accion_{combate_id}_habilidad1"),
-            InlineKeyboardButton("🔮 Habilidad 2", callback_data=f"combate_accion_{combate_id}_habilidad2"),
+            InlineKeyboardButton(f"✨ {_hab1_enviar}", callback_data=f"combate_accion_{combate_id}_habilidad1"),
+            InlineKeyboardButton(f"🔮 {_hab2_enviar}", callback_data=f"combate_accion_{combate_id}_habilidad2"),
         ])
     keyboard.append([InlineKeyboardButton("🧪 Usar poción", callback_data=f"combate_accion_{combate_id}_pocion")])
     if tipo == COMBATE_PVP_AMISTOSO:
@@ -1122,13 +1222,14 @@ def _construir_panel_pvp(combate_id: str, viewer_id: int) -> tuple:
 
     _rest_pvp2 = combate.get("restricciones", {})
     _permit_hab_pvp2 = _rest_pvp2.get("habilidades_pvp", True)
+    _hab1_pvp2, _hab2_pvp2 = _get_nombres_habilidades(viewer_id)
     keyboard = [
         [InlineKeyboardButton("⚔️ Atacar", callback_data=f"combate_accion_{combate_id}_ataque")],
     ]
     if _permit_hab_pvp2:
         keyboard.append([
-            InlineKeyboardButton("✨ Habilidad 1", callback_data=f"combate_accion_{combate_id}_habilidad1"),
-            InlineKeyboardButton("🔮 Habilidad 2", callback_data=f"combate_accion_{combate_id}_habilidad2"),
+            InlineKeyboardButton(f"✨ {_hab1_pvp2}", callback_data=f"combate_accion_{combate_id}_habilidad1"),
+            InlineKeyboardButton(f"🔮 {_hab2_pvp2}", callback_data=f"combate_accion_{combate_id}_habilidad2"),
         ])
     keyboard.append([InlineKeyboardButton("🧪 Usar poción", callback_data=f"combate_accion_{combate_id}_pocion")])
     if tipo == COMBATE_PVP_AMISTOSO:
@@ -2142,18 +2243,22 @@ async def siguiente_sala_mazmorra(update: Update, context: ContextTypes.DEFAULT_
     color = zona_data["color"]
     num_monstruos = 1 if es_jefe else random.randint(1, 3)
     monstruos = []
+    # Escalar vida del monstruo al tamaño del grupo (cada jugador extra añade 80% de vida)
+    # Daño y defensa NO escalan — cada jugador se enfrenta individualmente
+    num_jugadores = len(maz["miembros"])
+    factor_grupo = 1.0 + (num_jugadores - 1) * 0.8
     for i in range(num_monstruos):
         tipo = "mazmorras_normal" if maz["dificultad"] == "normal" else "mazmorras_dificil"
         mon = generar_monstruo_escalable(lider_id, zona_nombre, color, tipo)
-        # Ajustar poder según dificultad y sala
-        factor = {"facil":0.8, "normal":1.0, "dificil":1.3}[maz["dificultad"]]
+        # Ajustar según dificultad, progresión de sala y tamaño del grupo
+        factor = {"facil": 0.8, "normal": 1.0, "dificil": 1.3}[maz["dificultad"]]
         factor_sala = 1 + (sala / total) * 0.5
-        mon["vida"] = int(mon["vida"] * factor * factor_sala)
+        mon["vida"]    = max(1, int(mon["vida"]    * factor * factor_sala * factor_grupo))
         mon["vida_max"] = mon["vida"]
-        mon["daño"] = int(mon["daño"] * factor * factor_sala)
-        mon["defensa"] = int(mon["defensa"] * factor * factor_sala)
-        mon["xp"] = int(mon["xp"] * factor * factor_sala)
-        mon["oro"] = int(mon["oro"] * factor * factor_sala)
+        mon["daño"]    = max(1, int(mon["daño"]    * factor * factor_sala))
+        mon["defensa"] = max(0, int(mon["defensa"] * factor * factor_sala))
+        mon["xp"]      = max(5, int(mon["xp"]      * factor * factor_sala))
+        mon["oro"]     = max(2, int(mon["oro"]      * factor * factor_sala))
         if es_jefe:
             mon["nombre"] = f"Jefe de Mazmorra - {mon['nombre']}"
         monstruos.append(mon)

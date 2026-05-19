@@ -96,27 +96,31 @@ def _mult_escasez() -> float:
         return 1.0
 
 def calcular_precio_oro(nivel, rareza):
+    # factor_oro=400 → precios exigentes pero alcanzables con juego constante.
+    # Admin puede sobreescribir via panel con "tienda_factor_oro".
     try:
         import config_db as _cdb
-        factor = _cdb.get("tienda_factor_oro", 300)
+        factor = _cdb.get("tienda_factor_oro", 400)
     except Exception:
-        factor = 300
+        factor = 400
     return int(nivel * factor * rareza * _mult_escasez())
 
 def calcular_precio_eternium(nivel, rareza):
+    # factor_eternium=12 → equilibra con la escasez de eternium en el juego.
     try:
         import config_db as _cdb
-        factor = _cdb.get("tienda_factor_eternium", 10)
+        factor = _cdb.get("tienda_factor_eternium", 12)
     except Exception:
-        factor = 10
+        factor = 12
     return max(20, int(nivel * rareza * factor * _mult_escasez()))
 
 def calcular_precio_creditos(nivel, rareza):
+    # factor_creditos=5 → créditos son premium, precios proporcionalmente altos.
     try:
         import config_db as _cdb
-        factor = _cdb.get("tienda_factor_creditos", 4)
+        factor = _cdb.get("tienda_factor_creditos", 5)
     except Exception:
-        factor = 4
+        factor = 5
     return max(5, nivel * rareza * factor)
 
 # ==================== CATÁLOGOS ====================

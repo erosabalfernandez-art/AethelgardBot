@@ -101,6 +101,7 @@ async def cmd_explorar(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("⛏️ Recolectar", callback_data="explorar_recol"),
             InlineKeyboardButton("🔍 Investigar", callback_data="explorar_invest"),
         ],
+        [InlineKeyboardButton("👥 Jugadores en zona", callback_data="explorar_zona_jug")],
         [InlineKeyboardButton("🗺️ Ver mapa",  callback_data="explorar_mapa"),
          InlineKeyboardButton("❌ Cerrar",    callback_data="explorar_cerrar")],
     ]
@@ -154,6 +155,14 @@ async def explorar_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await mod.cmd_investigar(update, context)
         except Exception as e:
             await query.edit_message_text(f"❌ Error al cargar la investigación: {e}")
+        return
+
+    if data == "explorar_zona_jug":
+        try:
+            import zona_activa as _za
+            await _za.cmd_zona_jugadores(update, context)
+        except Exception as e:
+            await query.edit_message_text(f"❌ Error al obtener jugadores en zona: {e}")
         return
 
 

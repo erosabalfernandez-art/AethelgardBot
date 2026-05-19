@@ -41,9 +41,9 @@ INVITACION_NIVEL_REQUERIDO_BONUS   = _cfg("invitacion_nivel_bonus",      15)
 MAZMORRAS_LIMITE_DIARIO  = _cfg("mazmorra_limite_diario", 2)
 MAZMORRAS_COSTES_ENTRADA = {
     "azul":     _cfg("mazmorra_coste_azul",     200),
-    "amarilla": _cfg("mazmorra_coste_amarilla", 300),
-    "roja":     _cfg("mazmorra_coste_roja",     400),
-    "negra":    _cfg("mazmorra_coste_negra",     20),
+    "amarilla": _cfg("mazmorra_coste_amarilla", 500),
+    "roja":     _cfg("mazmorra_coste_roja",     1000),
+    "negra":    _cfg("mazmorra_coste_negra",    2500),
 }
 MAZMORRAS_RECOMPENSA_ETERNIUM_NORMAL  = {"azul": (2, 5),   "amarilla": (5, 10),  "roja": (10, 20), "negra": (20, 40)}
 MAZMORRAS_RECOMPENSA_ETERNIUM_DIFICIL = {"azul": (6, 10),  "amarilla": (12, 20), "roja": (25, 40), "negra": (50, 80)}
@@ -198,3 +198,80 @@ BG_MAT_PRECIO_VENTA_ORO = _cfg("bg_mat_precio_venta_oro", 1.0)
 BG_MAT_PRECIO_VENTA_ETH = _cfg("bg_mat_precio_venta_eth", 1.0)
 BG_MAT_DROP_MULT        = _cfg("bg_mat_drop_mult",        1.0)
 BG_MAT_RAREZA_BONUS     = _cfg("bg_mat_rareza_bonus",     0)
+
+
+def recargar():
+    """Re-lee todos los valores de la DB y actualiza las constantes del módulo en memoria.
+    Llamar desde el panel admin después de cambiar cualquier valor de configuración.
+    """
+    import sys
+    m = sys.modules[__name__]
+    m.STAMINA_MAX_BASE              = _cfg("stamina_max_base",          100)
+    m.STAMINA_REGENERACION_SEGUNDOS = _cfg("stamina_regen_segundos",    180)
+    m.STAMINA_COSTE_POR_ZONA = {
+        "azul":     _cfg("stamina_coste_azul",     15),
+        "amarilla": _cfg("stamina_coste_amarilla", 25),
+        "roja":     _cfg("stamina_coste_roja",     40),
+        "negra":    _cfg("stamina_coste_negra",    60),
+    }
+    m.STAMINA_BONUS_POR_RECLUTA     = _cfg("stamina_bonus_por_recluta", 5)
+    m.STAMINA_MAX_EXTRA             = _cfg("stamina_max_extra",         200)
+    m.MAZMORRAS_LIMITE_DIARIO       = _cfg("mazmorra_limite_diario",    2)
+    m.MAZMORRAS_COSTES_ENTRADA = {
+        "azul":     _cfg("mazmorra_coste_azul",     200),
+        "amarilla": _cfg("mazmorra_coste_amarilla", 500),
+        "roja":     _cfg("mazmorra_coste_roja",     1000),
+        "negra":    _cfg("mazmorra_coste_negra",    2500),
+    }
+    m.MAZMORRAS_XP_MULT             = _cfg("mazmorra_xp_mult",                   1.0)
+    m.MAZMORRAS_ORO_MULT            = _cfg("mazmorra_oro_mult",                  1.0)
+    m.MAZMORRAS_ET_MULT             = _cfg("mazmorra_et_mult",                   1.0)
+    m.COMBATE_TIMEOUT_TURNO         = _cfg("combate_timeout_turno",              120)
+    m.COMBATE_PROB_HUIDA            = _cfg("combate_prob_huida",                 0.5)
+    m.COMBATE_CRITICO_PORCENTAJE    = _cfg("combate_critico_porcentaje",         15)
+    m.COMBATE_CRITICO_MULTIPLICADOR = _cfg("combate_critico_multiplicador",      2.0)
+    m.COMBATE_PVP_COOLDOWN_MIN      = _cfg("combate_pvp_cooldown_min",           5)
+    m.COMBATE_PVP_NIVEL_MINIMO      = _cfg("combate_pvp_nivel_minimo",           5)
+    m.COMBATE_PVP_ORO_VICTORIA      = _cfg("combate_pvp_oro_victoria",           50)
+    m.COMBATE_PVP_XP_VICTORIA       = _cfg("combate_pvp_xp_victoria",            80)
+    m.COMBATE_PVP_ORO_DERROTA       = _cfg("combate_pvp_oro_derrota",            10)
+    m.RECOLECCION_COOLDOWN = {
+        "azul":     _cfg("recoleccion_cooldown_azul",     300),
+        "amarilla": _cfg("recoleccion_cooldown_amarilla", 600),
+        "roja":     _cfg("recoleccion_cooldown_roja",     900),
+        "negra":    _cfg("recoleccion_cooldown_negra",    1800),
+    }
+    m.RECOLECCION_CANTIDAD_MULT     = _cfg("recoleccion_cantidad_mult",  1.0)
+    m.RECOLECCION_STAMINA_COSTE     = _cfg("recoleccion_stamina_coste",  10)
+    m.INVESTIGACION_COOLDOWN = {
+        "azul":     _cfg("investigacion_cooldown_azul",     600),
+        "amarilla": _cfg("investigacion_cooldown_amarilla", 1200),
+        "roja":     _cfg("investigacion_cooldown_roja",     1800),
+        "negra":    _cfg("investigacion_cooldown_negra",    3600),
+    }
+    m.VIAJE_TIEMPO_BASE_SEGUNDOS    = _cfg("viaje_tiempo_base_segundos", 60)
+    m.VIAJE_STAMINA_COSTE           = _cfg("viaje_stamina_coste",        5)
+    m.VIAJE_COOLDOWN_SEGUNDOS       = _cfg("viaje_cooldown_segundos",    30)
+    m.ECONOMIA_PVE_XP_MULT          = _cfg("economia_pve_xp_mult",       1.0)
+    m.ECONOMIA_PVE_ORO_MULT         = _cfg("economia_pve_oro_mult",       1.0)
+    m.ECONOMIA_XP_FORMULA_BASE      = _cfg("economia_xp_formula_base",   100)
+    m.ECONOMIA_XP_FORMULA_EXP       = _cfg("economia_xp_formula_exp",    1.5)
+    m.ECONOMIA_GOLD_CAP             = _cfg("economia_gold_cap",           0)
+    m.JEFE_HP_BASE                  = _cfg("jefe_hp_base",                10000)
+    m.JEFE_MULT_FACIL               = _cfg("jefe_mult_facil",             0.5)
+    m.JEFE_MULT_DIFICIL             = _cfg("jefe_mult_dificil",           2.0)
+    m.JEFE_MULT_LEGENDARIO          = _cfg("jefe_mult_legendario",        4.0)
+    m.JEFE_COOLDOWN_ATAQUE_SEG      = _cfg("jefe_cooldown_ataque_segundos", 30)
+    m.EVENTO_BONUS_XP_ACTIVO        = _cfg("evento_bonus_xp_activo",     False)
+    m.EVENTO_BONUS_ORO_ACTIVO       = _cfg("evento_bonus_oro_activo",    False)
+    m.EVENTO_BONUS_XP_MULT          = _cfg("evento_bonus_xp_mult",       2.0)
+    m.EVENTO_BONUS_ORO_MULT         = _cfg("evento_bonus_oro_mult",       2.0)
+    m.BG_ARMA_DAÑO                  = _cfg("bg_a_daño",                  1.0)
+    m.BG_ARMA_PRECIO_ORO            = _cfg("bg_a_precio_oro",            1.0)
+    m.BG_ARMA_PRECIO_ETH            = _cfg("bg_a_precio_eth",            1.0)
+    m.BG_ARMOR_DEFENSA              = _cfg("bg_ar_defensa",              1.0)
+    m.BG_ARMOR_PRECIO_ORO           = _cfg("bg_ar_precio_oro",           1.0)
+    m.BG_ARMOR_PRECIO_ETH           = _cfg("bg_ar_precio_eth",           1.0)
+    m.BG_POCION_EFECTO_MULT         = _cfg("bg_p_efecto_mult",           1.0)
+    m.BG_POCION_PRECIO_ORO          = _cfg("bg_p_precio_oro",            1.0)
+    m.BG_MAT_DROP_MULT              = _cfg("bg_mat_drop_mult",           1.0)

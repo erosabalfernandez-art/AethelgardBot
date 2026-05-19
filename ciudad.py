@@ -189,11 +189,11 @@ async def _mostrar_menu_principal_msg(update, context, user_id: int, jug=None, e
     montura = _obtener_montura_activa_nombre(user_id)
     texto = (
         f"🏙️ *Bienvenido a la Ciudad*\n\n"
-        f"🧙 {jug['nombre_personaje']} | Nivel {jug['nivel']} | {jug['clase']}\n"
+        f"🧙 {_esc_md(jug['nombre_personaje'])} | Nivel {jug['nivel']} | {_esc_md(str(jug['clase']))}\n"
         f"❤️ HP: {jug['hp_actual']}/{jug['hp_max']}\n"
     )
     if montura:
-        texto += f"🐎 Montura activa: {montura}\n"
+        texto += f"🐎 Montura activa: {_esc_md(montura)}\n"
     texto += "\n¿Qué deseas hacer?"
     # ── Comprobar si hay guerra de facciones activa ────────────────────────
     guerra_activa = None
@@ -211,7 +211,7 @@ async def _mostrar_menu_principal_msg(update, context, user_id: int, jug=None, e
         except Exception:
             marcador_txt = "⚔️ *GUERRA DE FACCIONES ACTIVA*"
         texto = (
-            f"🏙️ *{jug['nombre_personaje']}* — Ciudad en pie de guerra\n\n"
+            f"🏙️ *{_esc_md(jug['nombre_personaje'])}* — Ciudad en pie de guerra\n\n"
             f"{marcador_txt}\n\n"
             "🔒 _Las actividades normales están suspendidas. Elige tu acción:_"
         )
@@ -795,6 +795,31 @@ async def _finalizar_registro(query, context, clase_id: str, faccion: str):
             effective_user = query.from_user
             effective_message = query.message
         await _mis.mostrar_misiones_inicio(_FakeUpdate(), context)
+    except Exception:
+        pass
+    # Notificación al superadmin cuando se registra un nuevo jugador
+    try:
+        import os as _os_sa
+        import sqlite3 as _sq_sa
+        _sa_id = int(_os_sa.environ.get("SUPERADMIN_ID", 0))
+        if _sa_id:
+            _conn_sa = _sq_sa.connect(db_helper.DB_PATH)
+            _cur_sa  = _conn_sa.cursor()
+            _cur_sa.execute("SELECT COUNT(*) FROM jugadores")
+            _total_sa = _cur_sa.fetchone()[0]
+            _conn_sa.close()
+            await context.bot.send_message(
+                chat_id=_sa_id,
+                text=(
+                    f"🆕 *Nuevo jugador registrado*\n"
+                    f"👤 Nombre: *{_esc_md(nombre)}*\n"
+                    f"🛡️ Clase: {clase_id}\n"
+                    f"🏛️ Facción: {faccion}\n"
+                    f"🆔 ID: `{user_id}`\n"
+                    f"📊 Total jugadores: *{_total_sa}*"
+                ),
+                parse_mode="Markdown"
+            )
     except Exception:
         pass
 

@@ -2904,6 +2904,13 @@ async def cmd_faccion_auto(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== PANEL ADMIN ====================
 
 PANEL_CATEGORIAS = {
+    "comunicacion": {
+        "emoji": "📢", "titulo": "Comunicación", "nivel": 1,
+        "comandos": [
+            ("/broadcast_activos <mensaje>", "📡 Anuncio solo a jugadores activos en los últimos 10 min"),
+            ("/broadcast_todos <mensaje>",   "📢 Anuncio a TODOS los jugadores registrados"),
+        ]
+    },
     "simulaciones": {
         "emoji": "🎮", "titulo": "Simulaciones", "nivel": 99,
         "comandos": [
@@ -3611,6 +3618,13 @@ async def cb_panel_categoria(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except Exception:
             await update.effective_message.reply_text(texto, reply_markup=kb, parse_mode="HTML")
         return
+    if clave == "comunicacion":
+        texto, kb = _panel_broadcast_texto_teclado()
+        try:
+            await query.edit_message_text(texto, reply_markup=kb, parse_mode="HTML")
+        except Exception:
+            await update.effective_message.reply_text(texto, reply_markup=kb, parse_mode="HTML")
+        return
 
     import html as _html
     titulo_esc = _html.escape(cat['titulo'])
@@ -3652,6 +3666,218 @@ async def cb_panel_cerrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await query.edit_message_text("🛡️ Panel cerrado. Usa /panel_admin para volver a abrirlo.")
+
+
+async def cb_broadcast_modo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback: el admin eligió a quién enviar el broadcast. Pide el mensaje."""
+    query = update.callback_query
+    await query.answer()
+    user_id = update.effective_user.id
+    if _nivel_admin(user_id) < 1:
+        await query.answer("❌ Sin permisos.", show_alert=True)
+        return
+    data = query.data
+    if data == "bc_modo_activos":
+        modo = "activos"
+        n = len(db_helper.obtener_jugadores_activos(600))
+        label = f"🟢 jugadores activos ({n})"
+    elif data == "bc_modo_todos":
+        modo = "todos"
+        n = len(db_helper.obtener_todos_jugadores())
+        label = f"📢 TODOS los jugadores ({n})"
+    elif data.startswith("bc_modo_faccion_"):
+        faccion = data.replace("bc_modo_faccion_", "")
+        modo = f"faccion_{faccion}"
+        label = f"⚔️ jugadores de {faccion}"
+        n = "?"
+    elif data == "bc_cancelar":
+        context.user_data.pop("broadcast_modo", None)
+        texto, kb = _panel_broadcast_texto_teclado()
+        await query.edit_message_text(texto, reply_markup=kb, parse_mode="HTML")
+        return
+    else:
+        modo = "todos"
+        label = "TODOS"
+    context.user_data["broadcast_modo"] = modo
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ Cancelar envío", callback_data="bc_cancelar")]
+    ])
+    await query.edit_message_text(
+        f"📢 <b>Mensaje para: {label}</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "✏️ <b>Escribe tu mensaje ahora</b> (este chat, texto normal):\n\n"
+        "📝 <b>Ejemplos de formato HTML:</b>\n"
+        "  • <code>&lt;b&gt;texto en negrita&lt;/b&gt;</code>\n"
+        "  • <code>&lt;i&gt;texto en cursiva&lt;/i&gt;</code>\n"
+        "  • <code>&lt;code&gt;texto tipo código&lt;/code&gt;</code>\n"
+        "  • Emojis normales directamente: ⚔️🐉💎\n\n"
+        "⚠️ <b>Antes de enviar verás una vista previa para confirmar.</b>\n\n"
+        "Pulsa Cancelar si no quieres enviar nada.",
+        parse_mode="HTML",
+        reply_markup=kb,
+    )
+
+
+async def mh_broadcast_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """MessageHandler: captura el texto del admin cuando tiene un broadcast pendiente."""
+    user_id = update.effective_user.id
+    if _nivel_admin(user_id) < 1:
+        return
+    modo = context.user_data.get("broadcast_modo")
+    if not modo:
+        return
+    texto_msg = update.message.text or ""
+    if texto_msg.strip().lower() in ("/cancelar_broadcast", "cancelar_broadcast", "/cancelar", "cancelar"):
+        context.user_data.pop("broadcast_modo", None)
+        await update.message.reply_text(
+            "❌ <b>Envío cancelado.</b> No se envió ningún mensaje.",
+            parse_mode="HTML"
+        )
+        return
+    # Guardar el mensaje pendiente y mostrar vista previa
+    context.user_data["broadcast_preview"] = texto_msg
+    import html as _ht
+    preview_cortado = texto_msg[:800] + ("..." if len(texto_msg) > 800 else "")
+    if modo == "activos":
+        destino_label = f"🟢 jugadores activos ({len(db_helper.obtener_jugadores_activos(600))})"
+    elif modo == "todos":
+        destino_label = f"📢 TODOS los jugadores ({len(db_helper.obtener_todos_jugadores())})"
+    elif modo.startswith("faccion_"):
+        faccion = modo.replace("faccion_", "")
+        destino_label = f"⚔️ jugadores de {faccion}"
+    else:
+        destino_label = modo
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Confirmar y Enviar", callback_data="bc_confirmar")],
+        [InlineKeyboardButton("✏️ Reescribir mensaje", callback_data=f"bc_reescribir_{modo}")],
+        [InlineKeyboardButton("❌ Cancelar", callback_data="bc_cancelar")],
+    ])
+    await update.message.reply_text(
+        f"👁️ <b>VISTA PREVIA DEL MENSAJE</b>\n"
+        f"Destinatarios: {destino_label}\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"{preview_cortado}\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        "¿Enviar este mensaje?",
+        parse_mode="HTML",
+        reply_markup=kb,
+    )
+
+
+async def cb_broadcast_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback: el admin confirma (o cancela) el envío después de ver la vista previa."""
+    query = update.callback_query
+    await query.answer()
+    user_id = update.effective_user.id
+    if _nivel_admin(user_id) < 1:
+        await query.answer("❌ Sin permisos.", show_alert=True)
+        return
+    data = query.data
+    if data == "bc_cancelar":
+        context.user_data.pop("broadcast_modo", None)
+        context.user_data.pop("broadcast_preview", None)
+        await query.edit_message_text("❌ <b>Envío cancelado.</b> No se envió ningún mensaje.", parse_mode="HTML")
+        return
+    if data.startswith("bc_reescribir_"):
+        modo = data.replace("bc_reescribir_", "")
+        context.user_data["broadcast_modo"] = modo
+        context.user_data.pop("broadcast_preview", None)
+        if modo == "activos":
+            label = f"🟢 jugadores activos ({len(db_helper.obtener_jugadores_activos(600))})"
+        elif modo == "todos":
+            label = f"📢 TODOS los jugadores ({len(db_helper.obtener_todos_jugadores())})"
+        elif modo.startswith("faccion_"):
+            faccion = modo.replace("faccion_", "")
+            label = f"⚔️ jugadores de {faccion}"
+        else:
+            label = modo
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ Cancelar envío", callback_data="bc_cancelar")]
+        ])
+        await query.edit_message_text(
+            f"✏️ <b>Reescribe el mensaje para: {label}</b>\n\n"
+            "Escribe el nuevo mensaje en este chat (texto normal):\n"
+            "Puedes usar HTML: <b>negrita</b>, <i>cursiva</i>, <code>código</code>\n\n"
+            "Pulsa Cancelar si no quieres enviar nada.",
+            parse_mode="HTML",
+            reply_markup=kb,
+        )
+        return
+    if data == "bc_confirmar":
+        texto_msg = context.user_data.pop("broadcast_preview", None)
+        modo = context.user_data.pop("broadcast_modo", None)
+        if not texto_msg or not modo:
+            await query.edit_message_text("❌ Error: no hay mensaje pendiente. Vuelve a iniciar.")
+            return
+        import broadcast as _bc
+        if modo == "activos":
+            jugadores_dest = db_helper.obtener_jugadores_activos(600)
+            n = len(jugadores_dest)
+            await query.edit_message_text(
+                f"⏳ Enviando a <b>{n}</b> jugadores activos...",
+                parse_mode="HTML"
+            )
+            task = await _bc.broadcast_activos(context.bot, texto_msg, parse_mode="HTML")
+            import asyncio as _asyncio
+            async def _done(t, q):
+                try:
+                    env, fall = await t
+                    await q.edit_message_text(
+                        f"✅ <b>Envío completado.</b>\n📤 Enviados: <b>{env}</b>  ❌ Fallidos: <b>{fall}</b>",
+                        parse_mode="HTML"
+                    )
+                except Exception:
+                    pass
+            _asyncio.create_task(_done(task, query))
+        elif modo == "todos":
+            jugadores_dest = db_helper.obtener_todos_jugadores()
+            n = len(jugadores_dest)
+            await query.edit_message_text(
+                f"⏳ Enviando a <b>{n}</b> jugadores registrados...",
+                parse_mode="HTML"
+            )
+            task = await _bc.broadcast_global(context.bot, texto_msg, parse_mode="HTML")
+            import asyncio as _asyncio
+            async def _done2(t, q):
+                try:
+                    env, fall = await t
+                    await q.edit_message_text(
+                        f"✅ <b>Envío completado.</b>\n📤 Enviados: <b>{env}</b>  ❌ Fallidos: <b>{fall}</b>",
+                        parse_mode="HTML"
+                    )
+                except Exception:
+                    pass
+            _asyncio.create_task(_done2(task, query))
+        elif modo.startswith("faccion_"):
+            faccion = modo.replace("faccion_", "")
+            try:
+                todos = db_helper.obtener_todos_jugadores()
+                dest = [j for j in todos if j.get("faccion") == faccion]
+            except Exception:
+                dest = []
+            n = len(dest)
+            await query.edit_message_text(
+                f"⏳ Enviando a <b>{n}</b> jugadores de {faccion}...",
+                parse_mode="HTML"
+            )
+            import asyncio as _asyncio
+            enviados, fallidos = 0, 0
+            for jug in dest:
+                try:
+                    await context.bot.send_message(
+                        chat_id=jug["user_id"],
+                        text=texto_msg,
+                        parse_mode="HTML",
+                    )
+                    enviados += 1
+                except Exception:
+                    fallidos += 1
+                await _asyncio.sleep(0.05)
+            await query.edit_message_text(
+                f"✅ <b>Enviado a {faccion}.</b>\n📤 Enviados: <b>{enviados}</b>  ❌ Fallidos: <b>{fallidos}</b>",
+                parse_mode="HTML"
+            )
+
 
 async def cb_abrir_panel_maestro(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Abre el Panel Maestro (panel_admin) desde el botón inline del panel de superadmin."""
@@ -3719,6 +3945,36 @@ def _fmt_seg(s: int) -> str:
         return f"{m}m {seg}s" if seg else f"{m}m"
     return f"{seg}s"
 
+def _panel_broadcast_texto_teclado():
+    """Genera el texto e InlineKeyboard del panel de comunicación."""
+    jugadores = db_helper.obtener_todos_jugadores()
+    activos   = db_helper.obtener_jugadores_activos(600)
+    total     = len(jugadores)
+    n_activos = len(activos)
+    texto = (
+        "📢 <b>PANEL DE COMUNICACIÓN</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"👥 Jugadores registrados: <b>{total}</b>\n"
+        f"🟢 Activos últimos 10 min: <b>{n_activos}</b>\n\n"
+        "<b>¿A quién quieres enviar el mensaje?</b>\n"
+        "<i>Elige un destino y luego escribe tu mensaje.</i>\n\n"
+        "💡 <b>Formatos disponibles:</b>\n"
+        "  <code>&lt;b&gt;negrita&lt;/b&gt;</code> → <b>negrita</b>\n"
+        "  <code>&lt;i&gt;cursiva&lt;/i&gt;</code> → <i>cursiva</i>\n"
+        "  <code>&lt;code&gt;código&lt;/code&gt;</code> → <code>código</code>\n"
+        "  Emojis normales: ⚔️🏹🐉💎 ✅❌"
+    )
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"🟢 Solo ACTIVOS ({n_activos})", callback_data="bc_modo_activos")],
+        [InlineKeyboardButton(f"📢 TODOS los jugadores ({total})", callback_data="bc_modo_todos")],
+        [InlineKeyboardButton("⚔️ Jugadores de Alianza", callback_data="bc_modo_faccion_Alianza")],
+        [InlineKeyboardButton("🏛️ Jugadores de Imperio", callback_data="bc_modo_faccion_Imperio")],
+        [InlineKeyboardButton("🗡️ Jugadores de Rebeldes", callback_data="bc_modo_faccion_Rebeldes")],
+        [InlineKeyboardButton("◀️ Volver al panel", callback_data="panel_volver")],
+    ])
+    return texto, kb
+
+
 def _panel_viajes_texto_teclado():
     lineas = ["🗺️ *Panel de Tiempos de Viaje*\n"]
     lineas.append("Ajusta cuánto tarda cada tipo de desplazamiento.")
@@ -3740,7 +3996,10 @@ def _panel_viajes_texto_teclado():
         ])
         kb.append([InlineKeyboardButton("─────────────────", callback_data="pv_noop")])
     kb.append([InlineKeyboardButton("⏳ Ver Cooldowns de Zona →", callback_data="pv_open_zonas")])
-    kb.append([InlineKeyboardButton("✅ Cerrar panel", callback_data="pv_cerrar")])
+    kb.append([
+        InlineKeyboardButton("⚙️ Volver a Config",  callback_data="cfg_volver"),
+        InlineKeyboardButton("✅ Cerrar panel",       callback_data="pv_cerrar"),
+    ])
     return "\n".join(lineas), InlineKeyboardMarkup(kb)
 
 async def cmd_panel_viajes(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3835,7 +4094,10 @@ def _panel_zonas_texto_teclado():
         ])
         kb.append([InlineKeyboardButton("─────────────────", callback_data="pz_noop")])
     kb.append([InlineKeyboardButton("🗺️ Ver Tiempos de Viaje →", callback_data="pz_open_viajes")])
-    kb.append([InlineKeyboardButton("✅ Cerrar panel", callback_data="pz_cerrar")])
+    kb.append([
+        InlineKeyboardButton("⚙️ Volver a Config",  callback_data="cfg_volver"),
+        InlineKeyboardButton("✅ Cerrar panel",       callback_data="pz_cerrar"),
+    ])
     return "\n".join(lineas), InlineKeyboardMarkup(kb)
 
 async def cmd_panel_zonas(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3940,6 +4202,10 @@ def _menu_categorias_cfg() -> tuple:
     if fila:
         botones.append(fila)
     botones.append([
+        InlineKeyboardButton("💱 Economía & Tiendas", callback_data="cfg_economia"),
+        InlineKeyboardButton("🗺️ Viajes & Zonas",     callback_data="cfg_viajes"),
+    ])
+    botones.append([
         InlineKeyboardButton("🌍 Acciones Masivas", callback_data="cfg_acciones"),
         InlineKeyboardButton("⚡ Eventos Rápidos",  callback_data="cfg_eventos"),
     ])
@@ -3981,11 +4247,11 @@ def _menu_valores_cfg(cat_idx: int) -> tuple:
             botones.append([InlineKeyboardButton(f"{txt}: {label[:28]}", callback_data=f"cfg_tog_{cat_idx}_{clave}")])
         else:
             botones.append([
-                InlineKeyboardButton(f"➖{step}",    callback_data=f"cfg_m_{cat_idx}_{clave}"),
-                InlineKeyboardButton("🔢→0",          callback_data=f"cfg_zero_{cat_idx}_{clave}"),
-                InlineKeyboardButton(f"✏️ {display}", callback_data=f"cfg_edit_{cat_idx}_{clave}"),
-                InlineKeyboardButton(f"➕{step}",    callback_data=f"cfg_p_{cat_idx}_{clave}"),
-                InlineKeyboardButton("🔄",            callback_data=f"cfg_rst_{cat_idx}_{clave}"),
+                InlineKeyboardButton(f"➖{step}",          callback_data=f"cfg_m_{cat_idx}_{clave}"),
+                InlineKeyboardButton("🔢→0",                callback_data=f"cfg_zero_{cat_idx}_{clave}"),
+                InlineKeyboardButton(f"💾 Guardar",        callback_data=f"cfg_edit_{cat_idx}_{clave}"),
+                InlineKeyboardButton(f"➕{step}",          callback_data=f"cfg_p_{cat_idx}_{clave}"),
+                InlineKeyboardButton("🔄 Reset",           callback_data=f"cfg_rst_{cat_idx}_{clave}"),
             ])
         texto += "\n"
     botones.append([InlineKeyboardButton("◀️ Categorías", callback_data="cfg_volver")])
@@ -4302,7 +4568,7 @@ async def cb_config_juego(update: Update, context: ContextTypes.DEFAULT_TYPE):
         schema = _cdb.CONFIG_SCHEMA.get(clave, {})
         texto, kb = _menu_valores_cfg(cat_idx)
         await _edit(texto, kb)
-        await query.answer(f"{'✅ Activado' if nuevo else '❌ Desactivado'}: {schema.get('label', clave)[:40]}", show_alert=False)
+        await query.answer(f"💾 Guardado — {'✅ Activado' if nuevo else '❌ Desactivado'}: {schema.get('label', clave)[:35]}", show_alert=False)
         return
 
     # ── Step ± ───────────────────────────────────────────────────────────────
@@ -4331,7 +4597,7 @@ async def cb_config_juego(update: Update, context: ContextTypes.DEFAULT_TYPE):
         _cdb.set(clave, nuevo)
         texto, kb = _menu_valores_cfg(cat_idx)
         await _edit(texto, kb)
-        await query.answer(f"{'➕' if es_suma else '➖'} → {schema.get('label', clave)[:35]}: {nuevo}", show_alert=False)
+        await query.answer(f"💾 Guardado — {schema.get('label', clave)[:30]}: {nuevo}", show_alert=False)
         return
 
     # ── Reset a default ───────────────────────────────────────────────────────
@@ -4352,7 +4618,7 @@ async def cb_config_juego(update: Update, context: ContextTypes.DEFAULT_TYPE):
         _cdb.set(clave, default)
         texto, kb = _menu_valores_cfg(cat_idx)
         await _edit(texto, kb)
-        await query.answer(f"🔄 Restaurado a default: {default}", show_alert=False)
+        await query.answer(f"💾 Guardado — 🔄 Restaurado al valor original: {default}", show_alert=False)
         return
 
     # ── Poner a cero ──────────────────────────────────────────────────────────
@@ -4375,7 +4641,7 @@ async def cb_config_juego(update: Update, context: ContextTypes.DEFAULT_TYPE):
         _cdb.set(clave, cero)
         texto, kb = _menu_valores_cfg(cat_idx)
         await _edit(texto, kb)
-        await query.answer(f"🔢→0: {schema.get('label', clave)[:40]} = 0", show_alert=False)
+        await query.answer(f"💾 Guardado — {schema.get('label', clave)[:35]} = 0", show_alert=False)
         return
 
     # ── Edición por texto ─────────────────────────────────────────────────────
@@ -4407,6 +4673,28 @@ async def cb_config_juego(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Escribe el nuevo valor ahora (o pulsa ❌ para cancelar):",
             kb_cancel
         )
+        return
+
+    # ── Economía & Tiendas — abre economia_panel inline ─────────────────────────
+    if data == "cfg_economia":
+        try:
+            import economia_panel as _ep
+            await _ep._abrir_panel(update, context)
+        except Exception as e:
+            kb_v = InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Volver", callback_data="cfg_volver")]])
+            await _edit(
+                f"❌ No se pudo abrir el panel de economía: {e}
+
+"
+                "Usa el comando /panel_economia directamente.",
+                kb_v
+            )
+        return
+
+    # ── Viajes & Zonas — abre paneles de viajes y zonas inline ───────────────
+    if data == "cfg_viajes":
+        texto, kb_v = _panel_viajes_texto_teclado()
+        await _edit(texto, kb_v)
         return
 
     if data == "cfg_cancel":
@@ -4780,6 +5068,12 @@ def registrar_handlers(app):
     app.add_handler(CallbackQueryHandler(cb_panel_cerrar,       pattern="^panel_cerrar$"))
     app.add_handler(CallbackQueryHandler(cb_abrir_panel_maestro,        pattern="^abrir_panel_maestro$"))
     app.add_handler(CallbackQueryHandler(cb_panel_abrir_restricciones,  pattern="^panel_abrir_restricciones$"))
+
+    # Broadcast interactivo desde el panel admin
+    app.add_handler(CallbackQueryHandler(cb_broadcast_modo, pattern="^bc_modo_"))
+    app.add_handler(CallbackQueryHandler(cb_broadcast_confirmar, pattern="^bc_(confirmar|cancelar|reescribir_)"))
+    from telegram.ext import MessageHandler, filters as _f_bc
+    app.add_handler(MessageHandler(_f_bc.TEXT & ~_f_bc.COMMAND, mh_broadcast_mensaje), group=11)
 
     # ── Panel de configuración permanente del juego ──────────────────────────
     app.add_handler(CommandHandler("config_juego", cmd_config_juego))

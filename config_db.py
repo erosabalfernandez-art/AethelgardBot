@@ -30,9 +30,9 @@ CONFIG_SCHEMA = {
     # ── 🌀 MAZMORRAS ──────────────────────────────────────────────
     "mazmorra_limite_diario":         {"default": 2,     "tipo": "int",   "cat": "🌀 Mazmorras",        "label": "Mazmorras por jugador al día",                "step": 1},
     "mazmorra_coste_azul":            {"default": 200,   "tipo": "int",   "cat": "🌀 Mazmorras",        "label": "Coste entrada mazmorra azul (oro)",           "step": 50},
-    "mazmorra_coste_amarilla":        {"default": 300,   "tipo": "int",   "cat": "🌀 Mazmorras",        "label": "Coste entrada mazmorra amarilla (oro)",       "step": 50},
-    "mazmorra_coste_roja":            {"default": 400,   "tipo": "int",   "cat": "🌀 Mazmorras",        "label": "Coste entrada mazmorra roja (oro)",           "step": 100},
-    "mazmorra_coste_negra":           {"default": 20,    "tipo": "int",   "cat": "🌀 Mazmorras",        "label": "Coste entrada mazmorra negra (eternium)",     "step": 5},
+    "mazmorra_coste_amarilla":        {"default": 500,   "tipo": "int",   "cat": "🌀 Mazmorras",        "label": "Coste entrada mazmorra amarilla (oro)",       "step": 50},
+    "mazmorra_coste_roja":            {"default": 1000,  "tipo": "int",   "cat": "🌀 Mazmorras",        "label": "Coste entrada mazmorra roja (oro)",           "step": 100},
+    "mazmorra_coste_negra":           {"default": 2500,  "tipo": "int",   "cat": "🌀 Mazmorras",        "label": "Coste entrada mazmorra negra (oro)",          "step": 100},
     "mazmorra_xp_mult":               {"default": 1.0,   "tipo": "float", "cat": "🌀 Mazmorras",        "label": "Multiplicador de XP en mazmorras",            "step": 0.1},
     "mazmorra_oro_mult":              {"default": 1.0,   "tipo": "float", "cat": "🌀 Mazmorras",        "label": "Multiplicador de oro en mazmorras",           "step": 0.1},
     "mazmorra_et_mult":               {"default": 1.0,   "tipo": "float", "cat": "🌀 Mazmorras",        "label": "Multiplicador de eternium en mazmorras",      "step": 0.1},
@@ -89,7 +89,8 @@ CONFIG_SCHEMA = {
     "recoleccion_cooldown_roja":      {"default": 900,   "tipo": "int",   "cat": "🌿 Recolección",      "label": "Cooldown recolección roja (segundos)",        "step": 60},
     "recoleccion_cooldown_negra":     {"default": 1800,  "tipo": "int",   "cat": "🌿 Recolección",      "label": "Cooldown recolección negra (segundos)",       "step": 300},
     "recoleccion_cantidad_mult":      {"default": 1.0,   "tipo": "float", "cat": "🌿 Recolección",      "label": "×Cantidad de materiales obtenidos",           "step": 0.1},
-    "recoleccion_stamina_coste":      {"default": 10,    "tipo": "int",   "cat": "🌿 Recolección",      "label": "Stamina que cuesta recolectar",               "step": 1},
+    "recoleccion_stamina_coste":      {"default": 5,     "tipo": "int",   "cat": "🌿 Recolección",      "label": "Stamina que cuesta recolectar (legacy)",      "step": 1},
+    "stamina_recolectar":             {"default": 5,     "tipo": "int",   "cat": "🌿 Recolección",      "label": "Stamina que cuesta recolectar en zona",       "step": 1},
 
     # ── 🔬 INVESTIGACIÓN ──────────────────────────────────────────
     "investigacion_cooldown_azul":    {"default": 600,   "tipo": "int",   "cat": "🔬 Investigación",    "label": "Cooldown investigación azul (segundos)",      "step": 60},
@@ -98,6 +99,7 @@ CONFIG_SCHEMA = {
     "investigacion_cooldown_negra":   {"default": 3600,  "tipo": "int",   "cat": "🔬 Investigación",    "label": "Cooldown investigación negra (segundos)",     "step": 300},
     "investigacion_xp_mult":          {"default": 1.0,   "tipo": "float", "cat": "🔬 Investigación",    "label": "×XP por investigación",                       "step": 0.1},
     "investigacion_recomp_mult":      {"default": 1.0,   "tipo": "float", "cat": "🔬 Investigación",    "label": "×Recompensas de investigación",               "step": 0.1},
+    "stamina_explorar":               {"default": 5,     "tipo": "int",   "cat": "🔬 Investigación",    "label": "Stamina que cuesta investigar en zona",       "step": 1},
 
     # ── 🔨 CRAFTEO ────────────────────────────────────────────────
     "crafteo_descuento_porcentaje":   {"default": 0,     "tipo": "int",   "cat": "🔨 Crafteo",          "label": "Descuento global de materiales en crafteo (%)", "step": 5},
@@ -246,7 +248,95 @@ CONFIG_SCHEMA = {
     "bg_mat_precio_venta_eth": {"default": 1.0,  "tipo": "float", "cat": "🪨 Materiales","label": "×Precio venta eternium de materiales",     "step": 0.1},
     "bg_mat_drop_mult":        {"default": 1.0,  "tipo": "float", "cat": "🪨 Materiales","label": "×Prob. drop de todos los materiales",      "step": 0.1},
     "bg_mat_rareza_bonus":     {"default": 0,    "tipo": "int",   "cat": "🪨 Materiales","label": "+/- Rareza global de materiales",          "step": 1},
+
+    # ── 🎁 PREMIOS PvE POR ZONA ────────────────────────────────────
+    "pve_azul_xp_base":               {"default": 60,    "tipo": "int",   "cat": "🎁 Premios PvE",      "label": "PvE Azul: XP base por combate ganado",       "step": 10},
+    "pve_azul_oro_base":              {"default": 40,    "tipo": "int",   "cat": "🎁 Premios PvE",      "label": "PvE Azul: Oro base por combate ganado",       "step": 5},
+    "pve_amarilla_xp_base":           {"default": 120,   "tipo": "int",   "cat": "🎁 Premios PvE",      "label": "PvE Amarilla: XP base por combate ganado",   "step": 10},
+    "pve_amarilla_oro_base":          {"default": 80,    "tipo": "int",   "cat": "🎁 Premios PvE",      "label": "PvE Amarilla: Oro base por combate ganado",  "step": 10},
+    "pve_roja_xp_base":               {"default": 220,   "tipo": "int",   "cat": "🎁 Premios PvE",      "label": "PvE Roja: XP base por combate ganado",       "step": 20},
+    "pve_roja_oro_base":              {"default": 150,   "tipo": "int",   "cat": "🎁 Premios PvE",      "label": "PvE Roja: Oro base por combate ganado",      "step": 20},
+    "pve_negra_xp_base":              {"default": 400,   "tipo": "int",   "cat": "🎁 Premios PvE",      "label": "PvE Negra: XP base por combate ganado",      "step": 50},
+    "pve_negra_oro_base":             {"default": 280,   "tipo": "int",   "cat": "🎁 Premios PvE",      "label": "PvE Negra: Oro base por combate ganado",     "step": 50},
+    "pve_negra_et_base":              {"default": 5,     "tipo": "int",   "cat": "🎁 Premios PvE",      "label": "PvE Negra: Eternium base por combate",       "step": 1},
+    "pve_xp_nivel_mult":              {"default": 1.05,  "tipo": "float", "cat": "🎁 Premios PvE",      "label": "x XP extra por nivel del monstruo",          "step": 0.01},
+    "pve_streak_bonus_activo":        {"default": 0,     "tipo": "bool",  "cat": "🎁 Premios PvE",      "label": "Bonus de racha activo en PvE",               "step": 1},
+    "pve_streak_max_mult":            {"default": 2.0,   "tipo": "float", "cat": "🎁 Premios PvE",      "label": "Multiplicador maximo de racha PvE",           "step": 0.1},
+
+    # ── 🏹 PREMIOS PvP POR ZONA ────────────────────────────────────
+    "pvp_azul_xp_victoria":           {"default": 50,    "tipo": "int",   "cat": "🏹 Premios PvP",      "label": "PvP Azul: XP al vencer",                     "step": 10},
+    "pvp_azul_oro_victoria":          {"default": 30,    "tipo": "int",   "cat": "🏹 Premios PvP",      "label": "PvP Azul: Oro al vencer",                    "step": 10},
+    "pvp_amarilla_xp_victoria":       {"default": 120,   "tipo": "int",   "cat": "🏹 Premios PvP",      "label": "PvP Amarilla: XP al vencer",                 "step": 10},
+    "pvp_amarilla_oro_robo_pct":      {"default": 10,    "tipo": "int",   "cat": "🏹 Premios PvP",      "label": "PvP Amarilla: % del oro del vencido robado", "step": 5},
+    "pvp_roja_xp_victoria":           {"default": 250,   "tipo": "int",   "cat": "🏹 Premios PvP",      "label": "PvP Roja: XP al vencer",                     "step": 25},
+    "pvp_roja_oro_robo_pct":          {"default": 25,    "tipo": "int",   "cat": "🏹 Premios PvP",      "label": "PvP Roja: % del oro del vencido robado",     "step": 5},
+    "pvp_negra_xp_victoria":          {"default": 500,   "tipo": "int",   "cat": "🏹 Premios PvP",      "label": "PvP Negra: XP al vencer",                    "step": 50},
+    "pvp_negra_oro_robo_pct":         {"default": 50,    "tipo": "int",   "cat": "🏹 Premios PvP",      "label": "PvP Negra: % del oro del vencido robado",    "step": 5},
+    "pvp_negra_et_bonus":             {"default": 10,    "tipo": "int",   "cat": "🏹 Premios PvP",      "label": "PvP Negra: Eternium bonus al vencer",        "step": 1},
+    "pvp_xp_mult_nivel":              {"default": 1.0,   "tipo": "float", "cat": "🏹 Premios PvP",      "label": "x XP si vences a jugador de mayor nivel",   "step": 0.1},
+    "pvp_racha_kills_bonus":          {"default": 0,     "tipo": "bool",  "cat": "🏹 Premios PvP",      "label": "Bonus por racha de kills PvP activo",         "step": 1},
+
+    # ── 🏰 PREMIOS MAZMORRAS POR COLOR ─────────────────────────────
+    "maz_azul_xp_bonus":              {"default": 200,   "tipo": "int",   "cat": "🏰 Premios Mazmorras","label": "Mazmorra Azul: XP bonus al completar",       "step": 50},
+    "maz_azul_oro_bonus":             {"default": 300,   "tipo": "int",   "cat": "🏰 Premios Mazmorras","label": "Mazmorra Azul: Oro bonus al completar",      "step": 50},
+    "maz_amarilla_xp_bonus":          {"default": 400,   "tipo": "int",   "cat": "🏰 Premios Mazmorras","label": "Mazmorra Amarilla: XP bonus al completar",   "step": 50},
+    "maz_amarilla_oro_bonus":         {"default": 600,   "tipo": "int",   "cat": "🏰 Premios Mazmorras","label": "Mazmorra Amarilla: Oro bonus al completar",  "step": 50},
+    "maz_roja_xp_bonus":              {"default": 700,   "tipo": "int",   "cat": "🏰 Premios Mazmorras","label": "Mazmorra Roja: XP bonus al completar",       "step": 100},
+    "maz_roja_oro_bonus":             {"default": 1000,  "tipo": "int",   "cat": "🏰 Premios Mazmorras","label": "Mazmorra Roja: Oro bonus al completar",      "step": 100},
+    "maz_negra_xp_bonus":             {"default": 1500,  "tipo": "int",   "cat": "🏰 Premios Mazmorras","label": "Mazmorra Negra: XP bonus al completar",      "step": 200},
+    "maz_negra_oro_bonus":            {"default": 2000,  "tipo": "int",   "cat": "🏰 Premios Mazmorras","label": "Mazmorra Negra: Oro bonus al completar",     "step": 200},
+    "maz_negra_et_bonus":             {"default": 25,    "tipo": "int",   "cat": "🏰 Premios Mazmorras","label": "Mazmorra Negra: Eternium bonus al completar","step": 5},
+    "maz_dificil_xp_extra_pct":       {"default": 50,    "tipo": "int",   "cat": "🏰 Premios Mazmorras","label": "Mazmorra Dificil: % XP extra sobre normal",  "step": 10},
+    "maz_dificil_oro_extra_pct":      {"default": 50,    "tipo": "int",   "cat": "🏰 Premios Mazmorras","label": "Mazmorra Dificil: % Oro extra sobre normal", "step": 10},
+    "maz_prob_item_raro":             {"default": 0.15,  "tipo": "float", "cat": "🏰 Premios Mazmorras","label": "Prob. drop item raro al terminar mazmorra",  "step": 0.05},
+    "maz_prob_item_epico":            {"default": 0.05,  "tipo": "float", "cat": "🏰 Premios Mazmorras","label": "Prob. drop item epico al terminar mazmorra", "step": 0.01},
+
+    # ── 🐉 PREMIOS JEFES RAID (detalle) ────────────────────────────
+    "jefe_et_base":                   {"default": 30,    "tipo": "int",   "cat": "🐉 Jefes Raid",       "label": "Eternium base por raid completado",           "step": 5},
+    "jefe_et_mult_dificil":           {"default": 2.0,   "tipo": "float", "cat": "🐉 Jefes Raid",       "label": "x Eternium en dificultad Dificil/Legendario", "step": 0.25},
+    "jefe_item_prob_normal":          {"default": 0.5,   "tipo": "float", "cat": "🐉 Jefes Raid",       "label": "Prob. item drop en raid Normal",              "step": 0.05},
+    "jefe_item_prob_dificil":         {"default": 0.75,  "tipo": "float", "cat": "🐉 Jefes Raid",       "label": "Prob. item drop en raid Dificil",             "step": 0.05},
+    "jefe_item_prob_legendario":      {"default": 1.0,   "tipo": "float", "cat": "🐉 Jefes Raid",       "label": "Prob. item drop en raid Legendario",          "step": 0.05},
+    "jefe_oro_bonus_tanque":          {"default": 200,   "tipo": "int",   "cat": "🐉 Jefes Raid",       "label": "Oro bonus al jugador mas danejado (tanque)",  "step": 50},
+    "jefe_xp_bonus_mvp":              {"default": 500,   "tipo": "int",   "cat": "🐉 Jefes Raid",       "label": "XP bonus al MVP (mas dano hecho al jefe)",   "step": 100},
+    "jefe_participacion_xp_min":      {"default": 100,   "tipo": "int",   "cat": "🐉 Jefes Raid",       "label": "XP minima por participar en raid sin dano",  "step": 25},
+
+    # ── ⚔️ PREMIOS GUERRA GREMIOS ──────────────────────────────────
+    "gg_oro_victoria":                {"default": 1000,  "tipo": "int",   "cat": "GG Premios Gremios",  "label": "Oro por victoria en guerra de gremios",      "step": 100},
+    "gg_xp_victoria":                 {"default": 500,   "tipo": "int",   "cat": "GG Premios Gremios",  "label": "XP por victoria en guerra de gremios",       "step": 50},
+    "gg_et_victoria":                 {"default": 15,    "tipo": "int",   "cat": "GG Premios Gremios",  "label": "Eternium por victoria en guerra de gremios", "step": 5},
+    "gg_oro_participacion":           {"default": 200,   "tipo": "int",   "cat": "GG Premios Gremios",  "label": "Oro por participar aunque se pierda",        "step": 50},
+    "gg_xp_participacion":            {"default": 100,   "tipo": "int",   "cat": "GG Premios Gremios",  "label": "XP por participar aunque se pierda",          "step": 25},
+    "gg_puntos_por_kill":             {"default": 10,    "tipo": "int",   "cat": "GG Premios Gremios",  "label": "Puntos de gremio por kill en guerra",        "step": 5},
+    "gg_contribucion_exp":            {"default": 50,    "tipo": "int",   "cat": "GG Premios Gremios",  "label": "EXP de gremio por contribucion en guerra",   "step": 10},
+    "gg_derrota_oro":                 {"default": 50,    "tipo": "int",   "cat": "GG Premios Gremios",  "label": "Oro de consolacion al perder guerra",        "step": 25},
+
+    # ── 🗡️ PREMIOS GUERRA FACCIONES (detalle) ──────────────────────
+    "gf_recompensa_1er":              {"default": 1000,  "tipo": "int",   "cat": "GF Premios Facciones","label": "Premio 1er puesto individual (oro)",          "step": 100},
+    "gf_recompensa_2do":              {"default": 600,   "tipo": "int",   "cat": "GF Premios Facciones","label": "Premio 2do puesto individual (oro)",          "step": 100},
+    "gf_recompensa_3er":              {"default": 300,   "tipo": "int",   "cat": "GF Premios Facciones","label": "Premio 3er puesto individual (oro)",          "step": 50},
+    "gf_recompensa_resto":            {"default": 100,   "tipo": "int",   "cat": "GF Premios Facciones","label": "Premio resto de participantes (oro)",         "step": 25},
+    "gf_xp_participacion":            {"default": 200,   "tipo": "int",   "cat": "GF Premios Facciones","label": "XP por participar en guerra de facciones",   "step": 50},
+    "gf_et_top3":                     {"default": 5,     "tipo": "int",   "cat": "GF Premios Facciones","label": "Eternium extra al Top 3 de la guerra",       "step": 1},
+    "gf_xp_kill":                     {"default": 50,    "tipo": "int",   "cat": "GF Premios Facciones","label": "XP por cada kill durante la guerra",         "step": 10},
+    "gf_puntos_kill":                 {"default": 15,    "tipo": "int",   "cat": "GF Premios Facciones","label": "Puntos individuales por kill en guerra",     "step": 5},
+
+    # ── 🗓️ PREMIOS LOGIN DIARIO & MISIONES ────────────────────────
+    "login_oro_dia1":                 {"default": 50,    "tipo": "int",   "cat": "Login y Misiones",    "label": "Oro login diario dia 1 / racha rota",        "step": 10},
+    "login_xp_dia1":                  {"default": 30,    "tipo": "int",   "cat": "Login y Misiones",    "label": "XP login diario dia 1 / racha rota",          "step": 10},
+    "login_racha_mult":               {"default": 0.1,   "tipo": "float", "cat": "Login y Misiones",    "label": "Extra por cada dia de racha (0.1 = +10%)",   "step": 0.05},
+    "login_racha_max_dias":           {"default": 7,     "tipo": "int",   "cat": "Login y Misiones",    "label": "Dias de racha maximos para el multiplicador","step": 1},
+    "login_dia7_et_bonus":            {"default": 10,    "tipo": "int",   "cat": "Login y Misiones",    "label": "Eternium bonus en dia 7 de racha",           "step": 1},
+    "mision_xp_facil":                {"default": 80,    "tipo": "int",   "cat": "Login y Misiones",    "label": "XP recompensa mision facil",                  "step": 10},
+    "mision_oro_facil":               {"default": 60,    "tipo": "int",   "cat": "Login y Misiones",    "label": "Oro recompensa mision facil",                 "step": 10},
+    "mision_xp_media":                {"default": 200,   "tipo": "int",   "cat": "Login y Misiones",    "label": "XP recompensa mision media",                  "step": 25},
+    "mision_oro_media":               {"default": 150,   "tipo": "int",   "cat": "Login y Misiones",    "label": "Oro recompensa mision media",                 "step": 25},
+    "mision_xp_dificil":              {"default": 450,   "tipo": "int",   "cat": "Login y Misiones",    "label": "XP recompensa mision dificil",                "step": 50},
+    "mision_oro_dificil":             {"default": 350,   "tipo": "int",   "cat": "Login y Misiones",    "label": "Oro recompensa mision dificil",               "step": 50},
+    "mision_et_dificil":              {"default": 5,     "tipo": "int",   "cat": "Login y Misiones",    "label": "Eternium recompensa mision dificil",          "step": 1},
+    "mision_max_diarias":             {"default": 3,     "tipo": "int",   "cat": "Login y Misiones",    "label": "Numero de misiones diarias por jugador",      "step": 1},
 }
+
 
 
 # ─── API PÚBLICA ─────────────────────────────────────────────────────────────
@@ -360,6 +450,12 @@ def _sync_runtime(clave: str, valor):
             zona = clave.replace("investigacion_cooldown_", "")
             if hasattr(_cb, "INVESTIGACION_COOLDOWN") and zona in _cb.INVESTIGACION_COOLDOWN:
                 _cb.INVESTIGACION_COOLDOWN[zona] = int(valor)
+
+        # Claves de stamina que explorar.py lee directamente de la DB
+        if clave == "stamina_recolectar":
+            pass  # explorar.py lee desde DB al momento de uso; no hay cache en config_balance
+        if clave == "stamina_explorar":
+            pass  # explorar.py lee desde DB al momento de uso; no hay cache en config_balance
 
     except Exception:
         pass

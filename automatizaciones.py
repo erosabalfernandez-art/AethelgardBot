@@ -1085,61 +1085,148 @@ def _auto_premios_toggle():
 
 _PANEL_ITEMS = [
     # (clave, etiqueta, tabla)  tabla: "auto" = automatizaciones_config, "bot" = config_bot
-    # ── Sistemas originales ──────────────────────────────────────────────────
-    ("lore_diario_activo",  "📖 Lore Diario (20:00 BR)",       "auto"),
-    ("auto_jefe_normal",    "⚔️ Jefe Auto Normal (semanal)",    "auto"),
-    ("auto_jefe_dificil",   "💀 Jefe Auto Difícil (semanal)",   "auto"),
-    ("auto_guerra",         "🏹 Guerra Facciones (diaria)",     "auto"),
-    ("gg_sin_aprobacion",   "🤝 G.Gremios sin aprobación",      "auto"),
-    ("auto_premios_activo", "🎁 Auto-Premios Especiales",        "bot"),
-    # ── Nuevos sistemas de jugabilidad ───────────────────────────────────────
-    ("login_diario_activo",    "🗓️ Login Diario + Racha",        "bot"),
-    ("misiones_diarias_activo","📋 Misiones Diarias Rotativas",  "bot"),
-    ("gchat_activo",           "💬 Chat de Gremio (/gchat)",     "bot"),
-    ("resumen_sesion_activo",  "📊 Resumen de Sesión (al regresar)", "bot"),
-    ("zona_activa_activo",     "👥 Jugadores Activos en Zona",   "bot"),
-    ("stamina_notif_activo",   "⚡ Notif. Stamina Llena",        "bot"),
-    ("cooldown_info_activo",   "⏱️ Panel de Cooldowns (/cd)",    "bot"),
-    ("item_comparar_activo",   "🔍 Comparar Item al Recoger",    "bot"),
-    ("anuncio_jefe_activo",    "📢 Anuncio Global Kill de Jefe", "bot"),
-    # ── Mejoras de rendimiento (on/off) ─────────────────────────────────────
-    ("throttle_antispam_activo", "🛡️ Anti-Spam Throttle (1.5s)",  "bot"),
-    ("rate_limiter_activo",    "📉 Rate Limiter Telegram (25/s)", "bot"),
+    # ── Eventos automáticos ──────────────────────────────────────────────────
+    ("lore_diario_activo",       "📖 Lore Diario (20:00 BR)",          "auto"),
+    ("auto_jefe_normal",         "⚔️ Jefe Auto Normal (semanal)",       "auto"),
+    ("auto_jefe_dificil",        "💀 Jefe Auto Difícil (semanal)",      "auto"),
+    ("auto_guerra",              "🏹 Guerra Facciones (diaria)",        "auto"),
+    ("gg_sin_aprobacion",        "🤝 G.Gremios sin aprobación",         "auto"),
+    ("auto_premios_activo",      "🎁 Auto-Premios Especiales",           "bot"),
+    # ── Sistemas de jugabilidad ──────────────────────────────────────────────
+    ("login_diario_activo",      "🗓️ Login Diario + Racha",             "bot"),
+    ("misiones_diarias_activo",  "📋 Misiones Diarias Rotativas",       "bot"),
+    ("gchat_activo",             "💬 Chat de Gremio (/gchat)",          "bot"),
+    ("resumen_sesion_activo",    "📊 Resumen de Sesión (al regresar)",  "bot"),
+    ("zona_activa_activo",       "👥 Jugadores Activos en Zona",        "bot"),
+    ("stamina_notif_activo",     "⚡ Notif. Stamina Llena",             "bot"),
+    ("cooldown_info_activo",     "⏱️ Panel de Cooldowns (/cd)",         "bot"),
+    ("item_comparar_activo",     "🔍 Comparar Item al Recoger",         "bot"),
+    ("anuncio_jefe_activo",      "📢 Anuncio Global Kill de Jefe",      "bot"),
+    # ── Combate y recompensas ─────────────────────────────────────────────────
+    ("evento_bonus_xp_activo",   "✨ Evento Doble XP (global)",         "bot"),
+    ("evento_bonus_oro_activo",  "💰 Evento Doble Oro (global)",        "bot"),
+    ("pvp_racha_kills_bonus",    "🏹 Bonus Racha Kills PvP",            "bot"),
+    ("pve_streak_bonus_activo",  "🌿 Bonus Racha PvE",                  "bot"),
+    # ── Rendimiento ──────────────────────────────────────────────────────────
+    ("throttle_antispam_activo", "🛡️ Anti-Spam Throttle (1.5s)",        "bot"),
+    ("rate_limiter_activo",      "📉 Rate Limiter Telegram (25/s)",     "bot"),
 ]
 
 
 def _paut_get(clave: str, tabla: str) -> str:
     if tabla == "bot":
-        return _auto_premios_estado()
+        try:
+            return db_helper.obtener_config(clave) or "0"
+        except Exception:
+            return "0"
     return _get(clave)
 
 
 def _paut_set(clave: str, tabla: str):
     if tabla == "bot":
-        _auto_premios_toggle()
+        try:
+            actual = db_helper.obtener_config(clave) or "0"
+            db_helper.establecer_config(clave, "0" if actual == "1" else "1")
+        except Exception:
+            pass
     else:
         _set(clave, "0" if _get(clave) == "1" else "1")
 
 
 def _texto_panel_auto() -> str:
-    lineas = ["⚙️ <b>PANEL DE AUTOMATIZACIONES</b>\n"]
+    lineas = ["⚙️ <b>PANEL DE AUTOMATIZACIONES</b>", "━━━━━━━━━━━━━━━━━━━━━"]
+    # Show key reward config values
+    try:
+        import config_db as _cdb
+        xp_pve  = _cdb.get("economia_pve_xp_mult", 1.0)
+        oro_pve = _cdb.get("economia_pve_oro_mult", 1.0)
+        xp_pvp  = _cdb.get("economia_pvp_xp_base", 80)
+        bonus_xp_on  = _cdb.get("evento_bonus_xp_activo", False)
+        bonus_oro_on = _cdb.get("evento_bonus_oro_activo", False)
+        lineas.append("")
+        lineas.append("📊 <b>Valores clave actuales:</b>")
+        lineas.append(f"  • PvE XP mult: <code>{xp_pve}x</code>  |  PvE Oro mult: <code>{oro_pve}x</code>")
+        lineas.append(f"  • PvP XP base: <code>{xp_pvp}</code>  |  Evento XP: {'<b>✅ ACTIVO</b>' if bonus_xp_on else '🔴 off'}  |  Evento Oro: {'<b>✅ ACTIVO</b>' if bonus_oro_on else '🔴 off'}")
+        lineas.append("")
+    except Exception:
+        lineas.append("")
+    lineas.append("<b>Toggles (toca para activar/desactivar):</b>")
+    # Group by section
+    seccion_actual = None
+    secciones = {
+        "lore_diario_activo": "🗓️ Eventos Auto",
+        "auto_jefe_normal": "🗓️ Eventos Auto",
+        "auto_jefe_dificil": "🗓️ Eventos Auto",
+        "auto_guerra": "🗓️ Eventos Auto",
+        "gg_sin_aprobacion": "🗓️ Eventos Auto",
+        "auto_premios_activo": "🗓️ Eventos Auto",
+        "login_diario_activo": "🎮 Jugabilidad",
+        "misiones_diarias_activo": "🎮 Jugabilidad",
+        "gchat_activo": "🎮 Jugabilidad",
+        "resumen_sesion_activo": "🎮 Jugabilidad",
+        "zona_activa_activo": "🎮 Jugabilidad",
+        "stamina_notif_activo": "🎮 Jugabilidad",
+        "cooldown_info_activo": "🎮 Jugabilidad",
+        "item_comparar_activo": "🎮 Jugabilidad",
+        "anuncio_jefe_activo": "🎮 Jugabilidad",
+        "evento_bonus_xp_activo": "⚔️ Combate y Premios",
+        "evento_bonus_oro_activo": "⚔️ Combate y Premios",
+        "pvp_racha_kills_bonus": "⚔️ Combate y Premios",
+        "pve_streak_bonus_activo": "⚔️ Combate y Premios",
+        "throttle_antispam_activo": "🛡️ Rendimiento",
+        "rate_limiter_activo": "🛡️ Rendimiento",
+    }
     for clave, etiqueta, tabla in _PANEL_ITEMS:
+        sec = secciones.get(clave)
+        if sec != seccion_actual:
+            seccion_actual = sec
+            lineas.append(f"\n<i>{sec}</i>")
         val = _paut_get(clave, tabla)
         icono = "🟢" if val == "1" else "🔴"
-        lineas.append(f"{icono} {etiqueta}")
-    lineas.append("\nPulsa un botón para activar/desactivar:")
+        lineas.append(f"  {icono} {etiqueta}")
+    lineas.append("\n━━━━━━━━━━━━━━━━━━━━━")
+    lineas.append("💡 Usa <b>⚙️ Config Premios</b> para ajustar valores numéricos.")
     return "\n".join(lineas)
 
 
 def _teclado_panel_auto():
     kb = []
+    seccion_actual = None
+    secciones = {
+        "lore_diario_activo": "eventos",
+        "auto_jefe_normal": "eventos",
+        "auto_jefe_dificil": "eventos",
+        "auto_guerra": "eventos",
+        "gg_sin_aprobacion": "eventos",
+        "auto_premios_activo": "eventos",
+        "login_diario_activo": "jugabilidad",
+        "misiones_diarias_activo": "jugabilidad",
+        "gchat_activo": "jugabilidad",
+        "resumen_sesion_activo": "jugabilidad",
+        "zona_activa_activo": "jugabilidad",
+        "stamina_notif_activo": "jugabilidad",
+        "cooldown_info_activo": "jugabilidad",
+        "item_comparar_activo": "jugabilidad",
+        "anuncio_jefe_activo": "jugabilidad",
+        "evento_bonus_xp_activo": "combate",
+        "evento_bonus_oro_activo": "combate",
+        "pvp_racha_kills_bonus": "combate",
+        "pve_streak_bonus_activo": "combate",
+        "throttle_antispam_activo": "rendimiento",
+        "rate_limiter_activo": "rendimiento",
+    }
     for clave, etiqueta, tabla in _PANEL_ITEMS:
         val = _paut_get(clave, tabla)
-        accion = "Desactivar" if val == "1" else "Activar"
+        estado = "🟢 ON" if val == "1" else "🔴 OFF"
+        accion = "⏸ Desactivar" if val == "1" else "▶️ Activar"
         kb.append([InlineKeyboardButton(
-            f"{etiqueta} — {accion}",
+            f"{estado} {etiqueta}  [{accion}]",
             callback_data=f"paut_tgl_{clave}"
         )])
+    kb.append([
+        InlineKeyboardButton("⚙️ Config Premios", callback_data="paut_cfg_premios"),
+        InlineKeyboardButton("🔄 Actualizar", callback_data="paut_ver"),
+    ])
     kb.append([InlineKeyboardButton("❌ Cerrar", callback_data="paut_cerrar")])
     return InlineKeyboardMarkup(kb)
 
@@ -1167,7 +1254,35 @@ async def cb_panel_auto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
     if data == "paut_cerrar":
-        await query.edit_message_text("✅ Panel de automatizaciones cerrado.")
+        await query.edit_message_text("✅ Panel de automatizaciones cerrado. Usa /panel_auto para volver.")
+        return
+    if data == "paut_cfg_premios":
+        try:
+            import config_db as _cdb
+            cats_rel = ["🎁 Premios PvE", "🏹 Premios PvP", "🏰 Premios Mazmorras",
+                        "🐉 Jefes Raid", "GG Premios Gremios", "GF Premios Facciones",
+                        "Login y Misiones", "⏰ Eventos Auto"]
+            lineas = ["⚙️ <b>CONFIGURACIÓN DE PREMIOS</b>\n━━━━━━━━━━━━━━━━━━━━━\n"]
+            cats = _cdb.get_categories()
+            for cat_name, items in cats.items():
+                if any(r in cat_name for r in ["Premios", "Jefes Raid", "GG", "GF", "Login", "Misiones", "Eventos"]):
+                    lineas.append(f"\n<b>{cat_name}</b>")
+                    for item in items[:6]:
+                        lineas.append(f"  • {item['label']}: <code>{item['valor_actual']}</code>")
+                    if len(items) > 6:
+                        lineas.append(f"  <i>... y {len(items)-6} más</i>")
+            lineas.append("\n━━━━━━━━━━━━━━━━━━━━━")
+            lineas.append("✏️ Para editar estos valores usa: /config_juego")
+            kb_cfg = InlineKeyboardMarkup([
+                [InlineKeyboardButton("⬅️ Volver a Automatizaciones", callback_data="paut_ver")]
+            ])
+            await query.edit_message_text(
+                "\n".join(lineas),
+                parse_mode="HTML",
+                reply_markup=kb_cfg
+            )
+        except Exception as e:
+            await query.answer(f"Error: {e}", show_alert=True)
         return
     if data == "paut_ver":
         try:

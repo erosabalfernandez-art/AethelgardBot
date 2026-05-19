@@ -450,11 +450,11 @@ async def _completar_viaje(user_id: int, destino_id: int, context: ContextTypes.
     except Exception:
         pass
 
-    # Mensaje de llegada
+    # Mensaje de llegada (sin botón, limpio)
     await bot.send_message(
         chat_id=user_id,
         text=f"✨ Has llegado a *{destino['nombre']}* (Territorio {destino['faccion_nombre']}).",
-        parse_mode="Markdown"
+        parse_mode="Markdown",
     )
 
     # Enviar teclado rápido actualizado según tipo de zona
@@ -471,24 +471,16 @@ async def _completar_viaje(user_id: int, destino_id: int, context: ContextTypes.
     else:
         try:
             from teclado_rapido import get_teclado_salvaje, _teclado_esta_oculto, marcar_tipo
+            _lore = destino.get("descripcion", destino["nombre"])
             if _teclado_esta_oculto(user_id):
-                await bot.send_message(user_id, "🌲 Zona salvaje. Usa `/recolectar`, `/investigar` o `/mazmorra` para actuar.", parse_mode="Markdown")
+                await bot.send_message(user_id, f"_{_lore}_", parse_mode="Markdown")
             else:
-                await bot.send_message(user_id, "🌲 Zona salvaje. Usa los botones de abajo para actuar.", reply_markup=get_teclado_salvaje(user_id))
+                await bot.send_message(user_id, f"_{_lore}_", parse_mode="Markdown", reply_markup=get_teclado_salvaje(user_id))
             marcar_tipo(user_id, "salvaje")
         except Exception:
-            await bot.send_message(user_id, "🌲 Usa `/recolectar` o `/investigar` para interactuar.", parse_mode="Markdown")
+            pass
 
-    # Toggle visual del menú "/" DESPUÉS del mensaje y teclado: el cliente ya
-    # renderizó los mensajes cuando recibe el cambio Default→Commands, lo que
-    # garantiza que re-fetche la caché de comandos con los de la nueva zona.
-    try:
-        from zonas_comandos import _disparar_toggle_menu
-        await _disparar_toggle_menu(bot, user_id)
-    except Exception:
-        pass
-
-    # ── Hook resumen_sesion: iniciar al llegar a salvaje, finalizar al llegar a ciudad ──
+    # ── Hook resumen_sesion ──
     if destino["tipo"] == "ciudad":
         try:
             import resumen_sesion as _rs
@@ -529,6 +521,19 @@ async def _completar_viaje(user_id: int, destino_id: int, context: ContextTypes.
         })
     except Exception:
         pass
+
+    # ── Botón al final (último mensaje = el más visible) ──────────────────────
+    # Se envía DESPUÉS de todos los demás mensajes para que el jugador lo vea
+    # inmediatamente sin tener que hacer scroll hacia arriba.
+    _kb_zona = InlineKeyboardMarkup([[
+        InlineKeyboardButton("📋 Ver comandos de zona", callback_data=f"viaje_ver_comandos_{user_id}")
+    ]])
+    await bot.send_message(
+        chat_id=user_id,
+        text="👆 *Toca el botón para actualizar el menú de comandos de tu nueva zona.*",
+        parse_mode="Markdown",
+        reply_markup=_kb_zona,
+    )
 
 async def _cancelar_viaje(user_id: int, context: ContextTypes.DEFAULT_TYPE):
     conn = sqlite3.connect(DB_PATH)
@@ -779,16 +784,24 @@ async def _iniciar_viaje_directo(update: Update, context: ContextTypes.DEFAULT_T
                     )
                 marcar_tipo(user_id, "ciudad")
             else:
+                _lore = destino.get("descripcion", destino["nombre"])
                 if not oculto:
                     await update.callback_query.message.reply_text(
-                        "🌲 Zona salvaje. Usa los botones de abajo para actuar.",
+                        f"_{_lore}_",
+                        parse_mode="Markdown",
                         reply_markup=get_teclado_salvaje(user_id)
                     )
                 marcar_tipo(user_id, "salvaje")
-            try:
-                await _disparar_toggle_menu(context.bot, user_id)
-            except Exception:
-                pass
+            # Botón al final — el más visible para el jugador
+            _kb_debug = InlineKeyboardMarkup([[
+                InlineKeyboardButton("📋 Ver comandos de zona", callback_data=f"viaje_ver_comandos_{user_id}")
+            ]])
+            await context.bot.send_message(
+                chat_id=user_id,
+                text="👆 *Toca el botón para actualizar el menú de comandos de tu nueva zona.*",
+                parse_mode="Markdown",
+                reply_markup=_kb_debug,
+            )
             return
     except Exception:
         pass
@@ -817,7 +830,8 @@ async def _iniciar_viaje_directo(update: Update, context: ContextTypes.DEFAULT_T
         if destino["tipo"] == "ciudad":
             await update.callback_query.message.reply_text("🏙️ Usa /ciudad.")
         else:
-            await update.callback_query.message.reply_text("🌲 Usa /explorar o /recolectar.")
+            _lore = destino.get("descripcion", destino["nombre"])
+            await update.callback_query.message.reply_text(f"_{_lore}_", parse_mode="Markdown")
         return
     await update.callback_query.edit_message_text(f"⏳ Viajando hacia {destino['nombre']}. Llegarás en {tiempo} segundos.")
     task = asyncio.create_task(_iniciar_viaje(user_id, destino["id"], tiempo, context))
@@ -872,11 +886,10 @@ async def vuelo_destino_seleccionado(update: Update, context: ContextTypes.DEFAU
     economia.modificar_saldo(user_id, "eternium", -PRECIO_VUELO_RAPIDO, "vuelo rápido")
     _actualizar_zona_jugador(user_id, destino_id)
     _actualizar_cooldown_entrada(user_id, destino["color"])
-    # Actualizar menú "/" ANTES del mensaje de llegada para que el cliente
-    # Telegram ya tenga los comandos nuevos cuando re-fetche al recibir el mensaje.
+    # Pre-cargar comandos en el servidor de Telegram sin disparar el toggle visual
     try:
-        from zonas_comandos import actualizar_comandos_jugador
-        await actualizar_comandos_jugador(context.bot, user_id)
+        from zonas_comandos import _preparar_comandos_sin_toggle
+        await _preparar_comandos_sin_toggle(context.bot, user_id)
     except Exception:
         pass
     await query.edit_message_text(f"✈️ Has llegado instantáneamente a *{destino['nombre']}*.", parse_mode="Markdown")
@@ -891,14 +904,24 @@ async def vuelo_destino_seleccionado(update: Update, context: ContextTypes.DEFAU
                 await query.message.reply_text("🏙️ Usa `/ciudad` para acceder a los servicios.", parse_mode="Markdown", reply_markup=get_teclado_principal(user_id))
             marcar_tipo(user_id, "ciudad")
         else:
+            _lore = destino.get("descripcion", destino["nombre"])
             if oculto:
-                await query.message.reply_text("🌲 Zona salvaje. Usa `/recolectar`, `/investigar` o `/mazmorra`.", parse_mode="Markdown")
+                await query.message.reply_text(f"_{_lore}_", parse_mode="Markdown")
             else:
-                await query.message.reply_text("🌲 Zona salvaje. Usa los botones de abajo para actuar.", reply_markup=get_teclado_salvaje(user_id))
+                await query.message.reply_text(f"_{_lore}_", parse_mode="Markdown", reply_markup=get_teclado_salvaje(user_id))
             marcar_tipo(user_id, "salvaje")
     except Exception:
         if destino["tipo"] == "ciudad":
             await query.message.reply_text("🏙️ Usa `/ciudad`.", parse_mode="Markdown")
+    # Botón al final — el más visible para el jugador
+    _kb_vuelo = InlineKeyboardMarkup([[
+        InlineKeyboardButton("📋 Ver comandos de zona", callback_data=f"viaje_ver_comandos_{user_id}")
+    ]])
+    await query.message.reply_text(
+        "👆 *Toca el botón para actualizar el menú de comandos de tu nueva zona.*",
+        parse_mode="Markdown",
+        reply_markup=_kb_vuelo,
+    )
 
 # ==================== COMANDOS DE MONTURAS ====================
 async def cmd_comprar_montura(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1122,6 +1145,31 @@ async def check_viaje_activo(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return True
 
 # ==================== RESTAURACIÓN AL INICIAR BOT ====================
+async def _cb_ver_comandos_zona(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Callback del botón 'Ver comandos de zona' en el mensaje de llegada."""
+    query = update.callback_query
+    await query.answer("🔄 Actualizando…", show_alert=False)
+    user_id = update.effective_user.id
+    bot = context.bot
+    # Editar el mensaje para quitar el botón (evita que se presione varias veces)
+    try:
+        await query.edit_message_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    # Disparar el toggle del menú "/"
+    try:
+        from zonas_comandos import _disparar_toggle_menu
+        await _disparar_toggle_menu(bot, user_id)
+    except Exception:
+        pass
+    # Confirmación visible para que el jugador sepa que funcionó
+    await bot.send_message(
+        chat_id=user_id,
+        text="✅ *Menú actualizado.* Escribe `/` para ver los comandos disponibles en esta zona.",
+        parse_mode="Markdown",
+    )
+
+
 async def restaurar_viajes_pendientes(app):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -1160,6 +1208,7 @@ def registrar_handlers(app):
     app.add_handler(CallbackQueryHandler(viaje_faccion_noop, pattern="^viaje_faccion_noop$"))
     app.add_handler(CallbackQueryHandler(vuelo_destino_seleccionado, pattern="^vuelo_destino_"))
     app.add_handler(CallbackQueryHandler(comprar_montura_seleccionada, pattern="^comprar_montura_"))
+    app.add_handler(CallbackQueryHandler(_cb_ver_comandos_zona, pattern=r"^viaje_ver_comandos_"))
 async def reanudar_viaje(update: Update, context: ContextTypes.DEFAULT_TYPE, viaje_pendiente: dict, cobrar_ciudad: bool = True):
     destino = _obtener_destino(viaje_pendiente["destino_id"])
     origen = _obtener_destino(viaje_pendiente["origen_id"])

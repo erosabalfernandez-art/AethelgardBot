@@ -64,6 +64,11 @@ def _gcfg(key: str, default) -> str:
 
 def _scfg(key: str, value) -> None:
     db_helper.establecer_config(key, str(value))
+    try:
+        import config_balance as _cb
+        _cb.recargar()
+    except Exception:
+        pass
 
 def _gcfg_float(key: str, default: float) -> float:
     try:
@@ -103,6 +108,16 @@ def cargar_overrides_maestro():
     _patch_xp()
     _patch_stats_clase()
     _patch_items_overrides()
+    _patch_config_balance()
+
+
+def _patch_config_balance():
+    """Re-aplica todos los valores de config_bot al módulo config_balance en memoria."""
+    try:
+        import config_balance as _cb
+        _cb.recargar()
+    except Exception:
+        pass
 
 
 def _patch_items_overrides():

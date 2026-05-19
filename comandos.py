@@ -2,6 +2,7 @@
 comandos.py — Menú contextual de comandos disponibles según la zona del jugador.
 /comandos  →  muestra un menú inline con todo lo que puedes hacer aquí.
 /destrabar →  limpia estados bloqueados (combate, mazmorra, viaje atascados).
+/menu      →  muestra u oculta el menú rápido inferior.
 """
 
 import sqlite3 as _sqlite3
@@ -134,6 +135,7 @@ def _construir_texto(jug: dict, ubicacion: str, color: str, marcado: bool) -> st
         "`/mis_titulos`      — Tus títulos y cuál tienes activo",
         "`/membresia`        — Ver tu membresía y sus beneficios",
         "`/guia`             — Guía completa del juego",
+        "`/menu`             — Mostrar u ocultar el menú rápido inferior",
         "`/viajar`           — Viajar a otra zona",
         "`/estado_viaje`     — Ver destino y tiempo restante",
         "`/cancelar_viaje`   — Cancelar viaje en curso",
@@ -149,6 +151,8 @@ def _construir_texto(jug: dict, ubicacion: str, color: str, marcado: bool) -> st
         lineas += [
             "━━━ *EN CIUDAD* ━━━",
             "`/ciudad`         — Menú principal (tiendas, crafteo, banco…)",
+        "  🔄 *Actualizar menú:* primer botón del menú inferior — sincroniza zona/guerra",
+        "  ⚙️ *Editar menú:* personaliza qué botones aparecen en cada menú (solo en ciudad)",
             "  🛠️ *Servicios:* crafteo · encantar · herrero · taberna",
             "  🛒 *Comercio:* tienda · subastas · mercado P2P",
             "  🏦 *Banco:* cambio de monedas (Oro ↔ Eternium)",

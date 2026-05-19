@@ -110,19 +110,20 @@ async def mostrar_zona_activa_llegada(bot, user_id: int, zona: str):
 
 async def cmd_zona_jugadores(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    msg = update.effective_message
     jug = db_helper.obtener_jugador(user_id)
     if not jug:
-        await update.message.reply_text("⚠️ Primero regístrate con /start.")
+        await msg.reply_text("⚠️ Primero regístrate con /start.")
         return
     if not _activo():
-        await update.message.reply_text("⚠️ El indicador de zona activa está desactivado.")
+        await msg.reply_text("⚠️ El indicador de zona activa está desactivado.")
         return
 
     zona = jug.get("zona_actual", "Desconocida")
     ubicacion = jug.get("ubicacion", "ciudad")
 
     if ubicacion != "salvaje":
-        await update.message.reply_text(
+        await msg.reply_text(
             "🏙️ Estás en una ciudad. Este comando solo funciona en zonas salvajes.\n"
             "Viaja a una zona con /viajar."
         )
@@ -130,7 +131,7 @@ async def cmd_zona_jugadores(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     jugadores = obtener_jugadores_en_zona(zona, excluir_uid=user_id)
     texto = texto_jugadores_zona(zona, jugadores, jug.get("faccion"))
-    await update.message.reply_text(texto, parse_mode="HTML")
+    await msg.reply_text(texto, parse_mode="HTML")
 
 
 def registrar_handlers(app):

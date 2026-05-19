@@ -160,8 +160,40 @@ def _poder_jugador_sim(e: dict) -> float:
     dps = atk * (1 + crit / 100)
     return dps * hp * (1 + defn / 100)
 
+def _mon_key(nombre: str) -> str:
+    """Genera clave de config segura a partir del nombre del monstruo."""
+    import re
+    clave = nombre.lower().strip()
+    clave = re.sub(r'[^a-z0-9]', '_', clave)
+    clave = re.sub(r'_+', '_', clave).strip('_')
+    return f"mon_{clave[:40]}"
+
+
+def _get_mon_override(nombre: str) -> dict:
+    """Devuelve los stats guardados para este monstruo específico.
+    Retorna dict con 'hp', 'atk', 'def' (None si no hay override para ese stat)."""
+    k = _mon_key(nombre)
+    resultado = {}
+    for stat in ("hp", "atk", "def"):
+        try:
+            val = db_helper.obtener_config(f"{k}_{stat}")
+            resultado[stat] = int(val) if val is not None else None
+        except Exception:
+            resultado[stat] = None
+    return resultado
+
+
+def _set_mon_override(nombre: str, hp: int = None, atk: int = None, def_: int = None):
+    """Guarda stats permanentes para este monstruo específico en la DB."""
+    k = _mon_key(nombre)
+    if hp  is not None: db_helper.establecer_config(f"{k}_hp",  str(hp))
+    if atk is not None: db_helper.establecer_config(f"{k}_atk", str(atk))
+    if def_ is not None: db_helper.establecer_config(f"{k}_def", str(def_))
+
+
 def _gen_monster_stats(e: dict, subtipo: str, nombre: str) -> tuple:
-    """Devuelve (hp, atk, def) escalados al poder del jugador simulado."""
+    """Devuelve (hp, atk, def) para el monstruo.
+    Prioridad: override guardado por nombre > cálculo escalado al jugador."""
     if subtipo.startswith("raid_"):
         cfg  = MULT_RAID[subtipo]
         return cfg["hp"], (cfg["atk_min"] + cfg["atk_max"]) // 2, cfg["def"]
@@ -171,7 +203,27 @@ def _gen_monster_stats(e: dict, subtipo: str, nombre: str) -> tuple:
     vida    = max(1, int(pm ** 0.5 * 20))
     daño    = max(1, int(pm ** 0.5 * 4))
     defensa = max(1, int(pm ** 0.5 * 2))
+    # Aplicar override guardado para este monstruo específico
+    ov = _get_mon_override(nombre)
+    if ov.get("hp")  is not None: vida    = max(1, ov["hp"])
+    if ov.get("atk") is not None: daño    = max(1, ov["atk"])
+    if ov.get("def") is not None: defensa = max(0, ov["def"])
     return vida, daño, defensa
+
+
+def _parsear_stats_texto(texto: str) -> dict:
+    """Parsea 'atk=50 def=20 hp=1000' → {'atk': 50, 'def': 20, 'hp': 1000}.
+    Acepta cualquier orden y permite omitir claves."""
+    import re
+    resultado = {}
+    for clave in ("atk", "def", "hp"):
+        m = re.search(rf'\b{clave}\s*=\s*(\d+)', texto.lower())
+        if m:
+            try:
+                resultado[clave] = int(m.group(1))
+            except ValueError:
+                pass
+    return resultado
 
 def _calc_daño(atk: int, def_: int, crit_pct: int = 0) -> tuple:
     """Devuelve (daño_infligido, es_critico)."""
@@ -472,14 +524,14 @@ def _kb_clases():
     ])
 
 def _kb_niveles():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("Nv.10",  callback_data="sim_niv_10"),
-         InlineKeyboardButton("Nv.30",  callback_data="sim_niv_30"),
-         InlineKeyboardButton("Nv.50",  callback_data="sim_niv_50")],
-        [InlineKeyboardButton("Nv.75",  callback_data="sim_niv_75"),
-         InlineKeyboardButton("Nv.100", callback_data="sim_niv_100")],
-        [InlineKeyboardButton("◀️ Atras", callback_data="sim_back_cls")],
-    ])
+    filas = []
+    niveles = list(range(10, 101, 10))
+    for i in range(0, len(niveles), 5):
+        fila = [InlineKeyboardButton(f"Nv.{n}", callback_data=f"sim_niv_{n}")
+                for n in niveles[i:i+5]]
+        filas.append(fila)
+    filas.append([InlineKeyboardButton("◀️ Atras", callback_data="sim_back_cls")])
+    return InlineKeyboardMarkup(filas)
 
 def _kb_reencarnaciones():
     return InlineKeyboardMarkup([
@@ -545,6 +597,8 @@ def _kb_combate(e: dict):
         # Extra
         [InlineKeyboardButton("📊 Cambiar clase/nivel", callback_data="sim_recfg"),
          InlineKeyboardButton("🔄 Reiniciar",            callback_data="sim_rst")],
+        [InlineKeyboardButton("✏️ Editar stats exactos", callback_data="sim_edit_stats"),
+         InlineKeyboardButton("⚖️ Auto-balance",         callback_data="sim_autobal")],
         [InlineKeyboardButton("💾 Aplicar al juego", callback_data="sim_aplc"),
          InlineKeyboardButton("❌ Salir",              callback_data="sim_exit")],
     ])
@@ -554,9 +608,10 @@ def _kb_aplicar(e: dict):
     atk_m = e.get("atk_m", 0)
     def_m = e.get("def_m", 0)
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"❤️ Aplicar vida monstruo (HP:{hp_m})", callback_data="sim_apl_mv")],
-        [InlineKeyboardButton(f"⚔️ Aplicar daño monstruo (ATK:{atk_m})", callback_data="sim_apl_md")],
-        [InlineKeyboardButton(f"🛡️ Aplicar defensa monstruo (DEF:{def_m})", callback_data="sim_apl_mdf")],
+        [InlineKeyboardButton(f"💾 Guardar TODO (HP:{hp_m} ATK:{atk_m} DEF:{def_m})", callback_data="sim_apl_all")],
+        [InlineKeyboardButton(f"❤️ Solo HP → {hp_m}", callback_data="sim_apl_mv")],
+        [InlineKeyboardButton(f"⚔️ Solo ATK → {atk_m}", callback_data="sim_apl_md")],
+        [InlineKeyboardButton(f"🛡️ Solo DEF → {def_m}", callback_data="sim_apl_mdf")],
         [InlineKeyboardButton("◀️ Volver al simulador", callback_data="sim_go")],
     ])
 
@@ -1025,6 +1080,55 @@ async def cb_simulador(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text(_texto_panel(e), parse_mode="Markdown", reply_markup=_kb_combate(e))
         return
 
+    # ── EDITAR STATS EXACTOS (entrada de texto) ───────────────────────────────
+    if data == "sim_edit_stats":
+        await q.edit_message_text(
+            "✏️ *Editar Stats*\nElige qué stats quieres editar:",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("👹 Stats monstruo", callback_data="sim_edit_mon"),
+                 InlineKeyboardButton("👤 Stats jugador",  callback_data="sim_edit_jug")],
+                [InlineKeyboardButton("◀️ Volver",          callback_data="sim_go")],
+            ]),
+        )
+        return
+
+    if data == "sim_edit_mon":
+        e["busqueda"] = "input_mon"
+        hp_m  = e.get("hp_m_max", e.get("hp_m", 0))
+        atk_m = e.get("atk_m", 0)
+        def_m = e.get("def_m", 0)
+        await q.edit_message_text(
+            f"✏️ *Editar stats del monstruo*\n\n"
+            f"Stats actuales: ATK={atk_m}  DEF={def_m}  HP={hp_m}\n\n"
+            f"Escribe los nuevos valores en formato:\n"
+            f"`atk=X def=Y hp=Z`\n\n"
+            f"_(Puedes omitir los que no quieras cambiar)_",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("◀️ Cancelar", callback_data="sim_go")
+            ]]),
+        )
+        return
+
+    if data == "sim_edit_jug":
+        e["busqueda"] = "input_jug"
+        hp_j  = e.get("hp_j_max", e.get("hp_j", 0))
+        atk_j = e.get("atk_j", 0)
+        def_j = e.get("def_j", 0)
+        await q.edit_message_text(
+            f"✏️ *Editar stats del jugador simulado*\n\n"
+            f"Stats actuales: ATK={atk_j}  DEF={def_j}  HP={hp_j}\n\n"
+            f"Escribe los nuevos valores en formato:\n"
+            f"`atk=X def=Y hp=Z`\n\n"
+            f"_(Puedes omitir los que no quieras cambiar)_",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("◀️ Cancelar", callback_data="sim_go")
+            ]]),
+        )
+        return
+
     # ── RECONFIGURAR CLASE/NIVEL ──────────────────────────────────────────────
     if data == "sim_recfg":
         e["combate_activo"] = False
@@ -1032,45 +1136,123 @@ async def cb_simulador(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                   parse_mode="Markdown", reply_markup=_kb_clases())
         return
 
+    # ── AUTO-BALANCE ─────────────────────────────────────────────────────────
+    if data == "sim_autobal":
+        nombre_m = e.get("mon_nombre", "?")
+        # Calcular stats actuales del jugador (con el equipo que lleva ahora)
+        hp_j, atk_j, def_j, crit_j = _calc_stats_jugador(e)
+        # Balancear monstruo: ligeramente superior al jugador para un combate justo
+        hp_m_nuevo  = max(1,  int(hp_j  * 2.0))
+        atk_m_nuevo = max(1,  int(atk_j * 0.85))
+        def_m_nuevo = max(0,  int(def_j * 0.5))
+        # Aplicar al estado del simulador
+        e["hp_m"]     = hp_m_nuevo
+        e["hp_m_max"] = hp_m_nuevo
+        e["atk_m"]    = atk_m_nuevo
+        e["def_m"]    = def_m_nuevo
+        e["combate_activo"] = True
+        e.setdefault("log", []).append(f"Auto-balance: HP={hp_m_nuevo} ATK={atk_m_nuevo} DEF={def_m_nuevo}")
+        e["log"] = e["log"][-3:]
+        # Guardar permanentemente en DB para este monstruo
+        try:
+            _set_mon_override(nombre_m, hp=hp_m_nuevo, atk=atk_m_nuevo, def_=def_m_nuevo)
+            guardado = True
+        except Exception:
+            guardado = False
+        estado_guardado = "✅ Guardado en DB" if guardado else "⚠️ Error al guardar"
+        await q.edit_message_text(
+            f"⚖️ *Auto-balance aplicado*\n\n"
+            f"Monstruo: *{nombre_m}*\n\n"
+            f"Stats del jugador actual:\n"
+            f"  HP: `{hp_j}`  ATK: `{atk_j}`  DEF: `{def_j}`\n\n"
+            f"Stats balanceados del monstruo:\n"
+            f"  HP: `{hp_m_nuevo}` (×2.0 jugador)\n"
+            f"  ATK: `{atk_m_nuevo}` (×0.85 jugador)\n"
+            f"  DEF: `{def_m_nuevo}` (×0.5 jugador)\n\n"
+            f"{estado_guardado} — permanente para este monstruo.\n"
+            f"_Cambia el equipo del jugador y vuelve a pulsar para rebalancear._",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("⚖️ Rebalancear con equipo actual", callback_data="sim_autobal")],
+                [InlineKeyboardButton("💾 Ajustar manualmente",            callback_data="sim_aplc")],
+                [InlineKeyboardButton("▶️ Volver al simulador",            callback_data="sim_go")],
+            ]),
+        )
+        return
+
     # ── APLICAR AL JUEGO ──────────────────────────────────────────────────────
     if data == "sim_aplc":
+        nombre_m = e.get("mon_nombre", "?")
+        hp_m     = e.get("hp_m_max", 0)
+        atk_m    = e.get("atk_m", 0)
+        def_m    = e.get("def_m", 0)
+        # Mostrar overrides ya guardados para este monstruo
+        ov = _get_mon_override(nombre_m)
+        guardado_txt = ""
+        if any(v is not None for v in ov.values()):
+            partes = []
+            if ov.get("hp")  is not None: partes.append(f"HP={ov['hp']}")
+            if ov.get("atk") is not None: partes.append(f"ATK={ov['atk']}")
+            if ov.get("def") is not None: partes.append(f"DEF={ov['def']}")
+            guardado_txt = f"\n_Ya guardado: {', '.join(partes)}_"
         await q.edit_message_text(
-            "*Aplicar al juego*\n\n"
-            "Esto ajusta los multiplicadores globales de monstruos "
-            "(bg\\_m\\_vida, bg\\_m\\_daño, bg\\_m\\_def) en la config del juego, "
-            "basandose en los stats actuales del simulador.\n\n"
-            f"Stats actuales del monstruo:\n"
-            f"HP: {e.get('hp_m_max',0)}  ATK: {e.get('atk_m',0)}  DEF: {e.get('def_m',0)}",
+            f"💾 *Guardar stats en el juego*\n\n"
+            f"Monstruo: *{nombre_m}*{guardado_txt}\n\n"
+            f"Stats actuales en el simulador:\n"
+            f"HP: `{hp_m}`  ATK: `{atk_m}`  DEF: `{def_m}`\n\n"
+            f"Los stats se guardan *solo para este monstruo*.\n"
+            f"No afectan a ningún otro.",
             parse_mode="Markdown",
             reply_markup=_kb_aplicar(e),
         )
         return
 
     if data.startswith("sim_apl_"):
-        accion = data[8:]
-        msg_ok = ""
+        accion   = data[8:]
+        nombre_m = e.get("mon_nombre", "?")
+        msg_ok   = ""
         try:
-            poder_jug = _poder_jugador_sim(e)
-            mult      = MULT_SUBTIPO.get(e.get("subtipo", "normales"), 1.0)
-            pm        = poder_jug * mult
-            if accion == "mv":
-                hp_base = max(1, int(pm ** 0.5 * 20))
-                nuevo   = round(e.get("hp_m_max", hp_base) / hp_base, 3)
-                db_helper.establecer_config("bg_m_vida", str(nuevo))
-                msg_ok = f"bg_m_vida = {nuevo}"
+            if accion == "all":
+                hp_m  = e.get("hp_m_max", 0)
+                atk_m = e.get("atk_m", 0)
+                def_m = e.get("def_m", 0)
+                _set_mon_override(nombre_m, hp=hp_m, atk=atk_m, def_=def_m)
+                msg_ok = f"HP={hp_m}, ATK={atk_m}, DEF={def_m}"
+            elif accion == "mv":
+                hp_m = e.get("hp_m_max", 0)
+                _set_mon_override(nombre_m, hp=hp_m)
+                msg_ok = f"HP={hp_m}"
             elif accion == "md":
-                atk_base = max(1, int(pm ** 0.5 * 4))
-                nuevo    = round(e.get("atk_m", atk_base) / atk_base, 3)
-                db_helper.establecer_config("bg_m_daño", str(nuevo))
-                msg_ok = f"bg_m_daño = {nuevo}"
+                atk_m = e.get("atk_m", 0)
+                _set_mon_override(nombre_m, atk=atk_m)
+                msg_ok = f"ATK={atk_m}"
             elif accion == "mdf":
-                def_base = max(1, int(pm ** 0.5 * 2))
-                nuevo    = round(e.get("def_m", def_base) / def_base, 3)
-                db_helper.establecer_config("bg_m_def", str(nuevo))
-                msg_ok = f"bg_m_def = {nuevo}"
+                def_m = e.get("def_m", 0)
+                _set_mon_override(nombre_m, def_=def_m)
+                msg_ok = f"DEF={def_m}"
         except Exception as ex:
-            msg_ok = f"Error: {ex}"
-        await q.answer(f"✅ Aplicado: {msg_ok}", show_alert=True)
+            await q.answer(f"❌ Error al guardar: {ex}", show_alert=True)
+            return
+        # Actualizar el panel de aplicar para reflejar lo guardado
+        ov = _get_mon_override(nombre_m)
+        partes_ov = []
+        if ov.get("hp")  is not None: partes_ov.append(f"HP={ov['hp']}")
+        if ov.get("atk") is not None: partes_ov.append(f"ATK={ov['atk']}")
+        if ov.get("def") is not None: partes_ov.append(f"DEF={ov['def']}")
+        guardado_txt = ", ".join(partes_ov)
+        await q.edit_message_text(
+            f"✅ *Stats guardados correctamente*\n\n"
+            f"Monstruo: *{nombre_m}*\n"
+            f"Guardado: `{msg_ok}`\n\n"
+            f"_Estado actual en DB: {guardado_txt}_\n\n"
+            f"La próxima vez que se genere este monstruo en el juego "
+            f"usará estos stats permanentemente.",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("💾 Cambiar más stats", callback_data="sim_aplc")],
+                [InlineKeyboardButton("◀️ Volver al simulador", callback_data="sim_go")],
+            ]),
+        )
         return
 
     # ── NAVEGACION "ATRAS" ────────────────────────────────────────────────────
@@ -1209,6 +1391,70 @@ async def msg_busqueda_sim(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown",
                 reply_markup=_kb_resultados_pocion(resultados),
             )
+
+    elif modo == "input_mon":
+        e["busqueda"] = None
+        cambios = _parsear_stats_texto(texto)
+        if not cambios:
+            await update.message.reply_text(
+                "❌ Formato inválido. Escribe por ejemplo: `atk=50 def=20 hp=1000`\n"
+                "_(Puedes omitir los que no quieras cambiar)_",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("◀️ Volver", callback_data="sim_go")
+                ]]),
+            )
+            return
+        if "atk" in cambios:
+            e["atk_m"] = max(1, cambios["atk"])
+        if "def" in cambios:
+            e["def_m"] = max(0, cambios["def"])
+        if "hp" in cambios:
+            e["hp_m"]     = max(1, cambios["hp"])
+            e["hp_m_max"] = max(1, cambios["hp"])
+        if not e.get("combate_activo"):
+            e["combate_activo"] = True
+        partes = [f"ATK={e['atk_m']}", f"DEF={e['def_m']}", f"HP={e['hp_m_max']}"]
+        e.setdefault("log", []).append(f"Stats monstruo → {' '.join(partes)}")
+        e["log"] = e["log"][-3:]
+        await update.message.reply_text(
+            f"✅ Stats del monstruo actualizados:\n{chr(10).join(partes)}",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("▶️ Ver simulador", callback_data="sim_go")
+            ]]),
+        )
+
+    elif modo == "input_jug":
+        e["busqueda"] = None
+        cambios = _parsear_stats_texto(texto)
+        if not cambios:
+            await update.message.reply_text(
+                "❌ Formato inválido. Escribe por ejemplo: `atk=50 def=20 hp=1000`\n"
+                "_(Puedes omitir los que no quieras cambiar)_",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("◀️ Volver", callback_data="sim_go")
+                ]]),
+            )
+            return
+        if "atk" in cambios:
+            e["atk_j"] = max(1, cambios["atk"])
+        if "def" in cambios:
+            e["def_j"] = max(0, cambios["def"])
+        if "hp" in cambios:
+            e["hp_j"]     = max(1, cambios["hp"])
+            e["hp_j_max"] = max(1, cambios["hp"])
+        if not e.get("combate_activo"):
+            e["combate_activo"] = True
+        partes = [f"ATK={e['atk_j']}", f"DEF={e['def_j']}", f"HP={e['hp_j_max']}"]
+        e.setdefault("log", []).append(f"Stats jugador → {' '.join(partes)}")
+        e["log"] = e["log"][-3:]
+        await update.message.reply_text(
+            f"✅ Stats del jugador actualizados:\n{chr(10).join(partes)}",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("▶️ Ver simulador", callback_data="sim_go")
+            ]]),
+        )
 
 # ═══════════════════════════════════════════════════════════════════════════
 # REGISTRO DE HANDLERS
